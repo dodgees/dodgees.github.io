@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Erik Dodge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <img class="headshot" src="erik-headshot.jfif" alt="Erik Dodge">
+      <h1>Erik Dodge</h1>
+      <p class="tagline">Experienced fullstack software engineer that loves using software to solve problems and make a difference. Passionate about learning and building high-quality software in a fast-paced environment with experience at Fortune 500 companies, startups, and civic tech.</p>
+      <a class="linkedin" href="https://linkedin.com/in/erikdodge">linkedin.com/in/erikdodge</a>
+    </header>
+
+    <section class="experience">
+      <h2>Experience</h2>
+      <ul class="experience-list">
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">AuditMiner</span>
+            <span class="exp-meta">Senior Software Engineer · Oct 2024–Present</span>
+          </div>
+          <p class="exp-desc">Building software to streamline the audit industry.</p>
+        </li>
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">Paladin</span>
+            <span class="exp-meta">Senior Software Engineer · Apr 2022–Aug 2024</span>
+          </div>
+          <p class="exp-desc">Built volunteer management tools and self-service onboarding for legal service organizations at a civic tech platform.</p>
+        </li>
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">Object Partners</span>
+            <span class="exp-meta">Senior Consultant · Jun 2020–Apr 2022</span>
+          </div>
+          <p class="exp-desc">Developed REST APIs and Redis caching for Chewy's Autoship platform, responsible for the majority of their recurring order revenue.</p>
+        </li>
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">Proxibid</span>
+            <span class="exp-meta">Software Engineer · Apr 2018–Jun 2020</span>
+          </div>
+          <p class="exp-desc">Led front-end modernization with React and SEO improvements that got over a million additional pages indexed for an online auction platform.</p>
+        </li>
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">Session Fuse</span>
+            <span class="exp-meta">Software Engineer · Nov 2019–May 2020</span>
+          </div>
+          <p class="exp-desc">Designed and implemented a subscription service for a collaborative online audio engineering startup.</p>
+        </li>
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">Mutual of Omaha</span>
+            <span class="exp-meta">Application Developer · Jan 2016–Apr 2018</span>
+          </div>
+          <p class="exp-desc">Developed performance improvements and led refactoring initiatives across Java/Groovy and Teradata projects.</p>
+        </li>
+      </ul>
+    </section>
+
+    <section class="experience">
+      <h2>Volunteering</h2>
+      <ul class="experience-list">
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">Code for America</span>
+            <span class="exp-meta">National Advisory Council Member · Apr 2021–Apr 2022</span>
+          </div>
+          <p class="exp-desc">Elected to represent the Mountain-Plains region, providing feedback to support small and struggling brigades during the organization's mission revision.</p>
+        </li>
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">Code for Nebraska</span>
+            <span class="exp-meta">Brigade Captain / Team Lead · Sep 2020–Sep 2022</span>
+          </div>
+          <p class="exp-desc">Helped found Code for Nebraska and led development of civic tech projects including an eviction moratorium eligibility tool, a landlord transparency app, and a public payroll search site for the Flatwater Free Press.</p>
+        </li>
+        <li>
+          <div class="exp-header">
+            <span class="exp-company">YMCA</span>
+            <span class="exp-meta">Youth Sports Coach · 2022–Present</span>
+          </div>
+          <p class="exp-desc">Coaching youth soccer and basketball.</p>
+        </li>
+      </ul>
+    </section>
+
+    <section class="projects" id="projects" hidden>
+      <h2>Side projects</h2>
+      <ul class="project-list">
+        <li>
+          <a href="#">
+            <span class="project-name">FitPath</span>
+            <span class="project-desc">Personal fitness tracking</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.resellstack.com/">
+            <span class="project-name">Flip City</span>
+            <span class="project-desc">A game about the hustle of buying and reselling</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>Omaha, NE</p>
+    </footer>
+  </main>
+
+  <div id="easter-egg" aria-hidden="true">
+    <span>🎉 erik does indeed rulez 🎉</span>
+  </div>
+
+  <script>
+    const code = 'erikrulez';
+    let typed = '';
+
+    document.addEventListener('keydown', (e) => {
+      typed += e.key;
+      if (typed.length > code.length) typed = typed.slice(-code.length);
+      if (typed !== code) return;
+      typed = '';
+
+      const overlay = document.getElementById('easter-egg');
+      const projects = document.getElementById('projects');
+
+      overlay.classList.add('active');
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        projects.hidden = false;
+        projects.classList.add('reveal');
+        projects.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 1800);
+    });
+  </script>
+</body>
+</html>

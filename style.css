@@ -1,0 +1,242 @@
+/* ── Color tokens ── */
+:root {
+  --bg: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --divider: #e5e5e5;
+  --link: #1a1a1a;
+  --link-hover: #444444;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141414;
+    --text: #e8e8e8;
+    --muted: #888888;
+    --divider: #2e2e2e;
+    --link: #e8e8e8;
+    --link-hover: #aaaaaa;
+  }
+}
+
+/* ── Reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base ── */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* ── Layout ── */
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 3.5rem 2rem 4rem;
+}
+
+@media (max-width: 480px) {
+  main {
+    padding: 2.5rem 1.25rem 3rem;
+  }
+}
+
+/* ── Header ── */
+header {
+  margin-bottom: 2.5rem;
+}
+
+.headshot {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.linkedin {
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--divider);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.linkedin:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+/* ── Experience ── */
+.experience {
+  border-top: 1px solid var(--divider);
+  padding-top: 2rem;
+  margin-bottom: 3rem;
+}
+
+.experience h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+.experience-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.exp-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.2rem;
+}
+
+.exp-company {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.exp-meta {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.exp-desc {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+/* ── Projects ── */
+.projects {
+  border-top: 1px solid var(--divider);
+  padding-top: 2rem;
+  margin-bottom: 3rem;
+}
+
+.projects h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+.project-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.project-list a {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  min-height: 44px;
+  align-items: center;
+  color: var(--link);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.project-list a:hover {
+  color: var(--link-hover);
+}
+
+.project-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.project-desc {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+@media (max-width: 480px) {
+  .project-list a {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+  }
+}
+
+/* ── Easter egg ── */
+#easter-egg {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  font-size: 1.5rem;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 100;
+}
+
+#easter-egg.active {
+  animation: egg-flash 1.8s ease forwards;
+}
+
+@keyframes egg-flash {
+  0%   { opacity: 0; transform: scale(0.85); }
+  15%  { opacity: 1; transform: scale(1.05); }
+  40%  { opacity: 1; transform: scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+.projects.reveal {
+  animation: reveal-drop 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes reveal-drop {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Footer ── */
+footer {
+  border-top: 1px solid var(--divider);
+  padding-top: 1.5rem;
+}
+
+footer p {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
