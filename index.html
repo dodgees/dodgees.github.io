@@ -118,14 +118,23 @@
   </div>
 
   <script>
-    const code = 'erikrulez';
-    let typed = '';
+    const sequences = [
+      ['e','r','i','k','r','u','l','e','z'],
+      ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a']
+    ];
+    const maxLen = Math.max(...sequences.map(s => s.length));
+    let buffer = [];
 
     document.addEventListener('keydown', (e) => {
-      typed += e.key;
-      if (typed.length > code.length) typed = typed.slice(-code.length);
-      if (typed !== code) return;
-      typed = '';
+      buffer.push(e.key);
+      if (buffer.length > maxLen) buffer.shift();
+
+      const matched = sequences.some(seq =>
+        buffer.length >= seq.length &&
+        buffer.slice(-seq.length).every((k, i) => k === seq[i])
+      );
+      if (!matched) return;
+      buffer = [];
 
       const overlay = document.getElementById('easter-egg');
       const projects = document.getElementById('projects');
