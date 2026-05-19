@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ENOUGH IS ENOUGH — C.A.T.E.</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: #f5f0e8;
+      background-image:
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 28px,
+          rgba(0,0,0,0.03) 28px,
+          rgba(0,0,0,0.03) 29px
+        );
+      color: #1a1a1a;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 660px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+    }
+
+    /* ── MASTHEAD ── */
+    .masthead {
+      text-align: center;
+      border-top: 6px solid #1a1a1a;
+      border-bottom: 6px solid #1a1a1a;
+      padding: 1.5rem 0 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .org-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 0.75rem;
+    }
+
+    .headline {
+      font-size: clamp(3.5rem, 12vw, 5.5rem);
+      font-weight: 900;
+      line-height: 0.9;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+      color: #c0392b;
+      margin-bottom: 0.75rem;
+    }
+
+    .subheadline {
+      font-size: 1.1rem;
+      font-style: italic;
+      color: #444;
+    }
+
+    /* ── DIVIDER ── */
+    .rule {
+      border: none;
+      border-top: 3px solid #1a1a1a;
+      margin: 2rem 0;
+    }
+
+    .rule-thin {
+      border: none;
+      border-top: 1px solid #bbb;
+      margin: 1.75rem 0;
+    }
+
+    /* ── SECTION LABELS ── */
+    .section-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #c0392b;
+      margin-bottom: 0.6rem;
+    }
+
+    /* ── BODY COPY ── */
+    .body-copy {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 0.75rem;
+    }
+
+    .body-copy strong {
+      font-weight: 700;
+    }
+
+    /* ── GRIEVANCES ── */
+    .grievance-list {
+      list-style: none;
+      margin: 1rem 0;
+    }
+
+    .grievance-list li {
+      display: flex;
+      gap: 0.75rem;
+      align-items: baseline;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #d5cfc5;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .grievance-list li:last-child {
+      border-bottom: none;
+    }
+
+    .bullet {
+      flex-shrink: 0;
+      font-size: 1.1rem;
+      color: #c0392b;
+      font-weight: 900;
+      margin-top: 0.05em;
+    }
+
+    /* ── DEMANDS ── */
+    .demands-list {
+      list-style: none;
+      margin: 1rem 0;
+      counter-reset: demand;
+    }
+
+    .demands-list li {
+      counter-increment: demand;
+      display: flex;
+      gap: 1rem;
+      align-items: baseline;
+      padding: 0.55rem 0;
+      border-bottom: 1px solid #d5cfc5;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .demands-list li:last-child {
+      border-bottom: none;
+    }
+
+    .demands-list li::before {
+      content: counter(demand) ".";
+      flex-shrink: 0;
+      font-weight: 900;
+      font-size: 0.95rem;
+      color: #1a1a1a;
+      min-width: 1.4rem;
+    }
+
+    /* ── RALLY BLOCK ── */
+    .rally {
+      background-color: #c0392b;
+      color: #f5f0e8;
+      text-align: center;
+      padding: 2.25rem 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .rally-headline {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: clamp(1.75rem, 7vw, 2.75rem);
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      line-height: 1.05;
+      margin-bottom: 1.25rem;
+    }
+
+    .rally-detail {
+      font-size: 1rem;
+      line-height: 1.8;
+      opacity: 0.92;
+    }
+
+    .rally-detail strong {
+      font-weight: 700;
+      display: block;
+    }
+
+    .rally-note {
+      margin-top: 1.25rem;
+      font-size: 0.85rem;
+      font-style: italic;
+      opacity: 0.75;
+    }
+
+    /* ── ENDORSEMENT ── */
+    .endorsement {
+      border-left: 5px solid #c0392b;
+      padding: 1rem 1.25rem;
+      background: rgba(192, 57, 43, 0.05);
+      margin: 1.5rem 0;
+    }
+
+    .quote-text {
+      font-size: 1.15rem;
+      font-style: italic;
+      line-height: 1.65;
+      margin-bottom: 0.6rem;
+    }
+
+    .quote-attribution {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+
+    .quote-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 0.15rem;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 3px solid #1a1a1a;
+    }
+
+    .footer-stamp {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #aaa;
+      line-height: 1.8;
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 480px) {
+      .page { padding: 2rem 1.25rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- MASTHEAD -->
+    <header class="masthead">
+      <p class="org-name">Coalition Against Theatrical Excess &nbsp;·&nbsp; C.A.T.E.</p>
+      <h1 class="headline">Enough<br>Is<br>Enough</h1>
+      <p class="subheadline">Standing up to the fat cats at the Omaha Playhouse</p>
+    </header>
+
+    <!-- THE CRISIS -->
+    <section>
+      <p class="section-label">The Crisis</p>
+      <p class="body-copy">While hard-working Americans struggle to put food on the table, the actors of the <strong>Omaha Playhouse</strong> continue to rake in <strong>applause</strong>, costume changes, and <em>complimentary intermission cookies</em> — night after night after night.</p>
+      <p class="body-copy">This has gone on long enough. We will not be silent. We will not be distracted by a well-staged musical number. We will not applaud on cue.</p>
+    </section>
+
+    <hr class="rule">
+
+    <!-- GRIEVANCES -->
+    <section>
+      <p class="section-label">Our Grievances</p>
+      <ul class="grievance-list">
+        <li><span class="bullet">✦</span><span>Actors receive <strong>free water</strong> backstage. Bottled. Still. Possibly chilled. At whose expense?</span></li>
+        <li><span class="bullet">✦</span><span>Up to <strong>three (3) curtain calls</strong> per performance — an open display of ego that this community has enabled for far too long.</span></li>
+        <li><span class="bullet">✦</span><span><strong>Complimentary program booklets</strong> distributed freely at the door, listing everyone's headshot and their "favorite roles." Unbridled.</span></li>
+        <li><span class="bullet">✦</span><span>Stage lighting is adjusted <strong>specifically for their comfort</strong>. What about our comfort? We're the ones sitting in the dark.</span></li>
+        <li><span class="bullet">✦</span><span>These people get to <strong>pretend to be other people</strong> — on a real stage, with a real audience — and they call it a hobby. A <em>hobby.</em></span></li>
+        <li><span class="bullet">✦</span><span>Cast parties. <strong>Cast parties.</strong> We don't have parties when we finish our work. We just go home.</span></li>
+      </ul>
+    </section>
+
+    <hr class="rule">
+
+    <!-- DEMANDS -->
+    <section>
+      <p class="section-label">Our Demands</p>
+      <ol class="demands-list">
+        <li>Standing ovations must be <strong>earned</strong>, not reflexive. Show some spine.</li>
+        <li>The intermission cookie budget must be <strong>disclosed publicly</strong>.</li>
+        <li>Curtain calls shall not exceed <strong>one (1)</strong> per production, per run.</li>
+        <li>At least once per show, an actor must acknowledge, unprompted, that this is a <strong>community theater</strong>.</li>
+        <li>The word <strong>"phenomenal"</strong> in the program notes must be retired immediately. "Adequate" is available and more honest.</li>
+      </ol>
+    </section>
+
+    <!-- RALLY -->
+    <div class="rally">
+      <p class="rally-headline">Join Us<br>This Weekend</p>
+      <p class="rally-detail">
+        <strong>Where:</strong> Outside the Omaha Playhouse<br>
+        <strong>When:</strong> This weekend. We'll be out front.<br>
+        <strong>Bring:</strong> A sign. Righteous indignation. A lawn chair.
+      </p>
+      <p class="rally-note">Signs will be provided for those who forgot. Signs will also be confiscated from anyone who misspells "theatrical."</p>
+    </div>
+
+    <!-- ENDORSEMENT -->
+    <section>
+      <p class="section-label">Founding Statement</p>
+      <blockquote class="endorsement">
+        <p class="quote-text">"These actors have gone too far. I don't know exactly how, but I feel it in my bones. Hollywood has come to Omaha, and I will not stand for it — which is ironic, because I'll be standing outside all weekend."</p>
+        <p class="quote-attribution">— Jason</p>
+        <p class="quote-title">Founder &amp; Chief Grievance Officer, C.A.T.E.</p>
+      </blockquote>
+    </section>
+
+    <hr class="rule-thin">
+
+    <!-- FOOTER -->
+    <footer>
+      <p class="footer-stamp">
+        © Coalition Against Theatrical Excess (C.A.T.E.)<br>
+        Not affiliated with any actual union, labor movement, or grievance of merit.<br>
+        The Omaha Playhouse did nothing wrong.
+      </p>
+    </footer>
+
+  </div>
+</body>
+</html>
