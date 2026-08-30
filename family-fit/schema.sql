@@ -110,7 +110,7 @@ create policy "profiles_update_own"
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
--- No insert/delete for clients; profile rows come from the auth trigger.
+-- No insert/delete for clients; profile rows come from the auth trigger or the backfill above.
 
 -- Weigh-ins: family can read; each member writes only their own
 drop policy if exists "weigh_ins_select_authenticated" on public.weigh_ins;

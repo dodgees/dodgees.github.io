@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  competitionSinceDay,
+  localDateISO,
+  profileUpdateStatus,
+  weightLineFromSeries,
+} from "./board-math.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -22,13 +28,6 @@ const els = {
 
 let supabase = null;
 let session = null;
-
-function localDateISO(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 function todayISO() {
   return localDateISO();
@@ -93,9 +92,7 @@ async function loadBoard() {
   setBoardError("");
   els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
 
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const sinceDay = localDateISO(since);
+  const sinceDay = competitionSinceDay();
 
   const [profilesRes, weighRes, exerciseRes] = await Promise.all([
     supabase.from("profiles").select("id, display_name").order("display_name"),
@@ -141,16 +138,7 @@ async function loadBoard() {
 
   const cards = profiles.map((p) => {
     const series = weighByUser.get(p.id) || [];
-    let weightLine = "No weigh-ins in the last 30 days";
-    if (series.length === 1) {
-      weightLine = `Latest: ${series[0].weight_lbs} lbs (${series[0].recorded_on})`;
-    } else if (series.length > 1) {
-      const first = series[0];
-      const last = series[series.length - 1];
-      const delta = Number(last.weight_lbs) - Number(first.weight_lbs);
-      const sign = delta > 0 ? "+" : "";
-      weightLine = `${first.weight_lbs} → ${last.weight_lbs} lbs (${sign}${delta.toFixed(1)} over 30 days)`;
-    }
+    const weightLine = weightLineFromSeries(series);
     const mins = minutesByUser.get(p.id) || 0;
     const exerciseLine =
       mins > 0
@@ -265,17 +253,9 @@ function wireForms() {
       .update({ display_name })
       .eq("id", session.user.id)
       .select("id");
-    if (error) {
-      showStatus(error.message);
-      return;
-    }
-    if (!data?.length) {
-      showStatus(
-        "No profile row for this account. Ask the captain to re-run family-fit/schema.sql (includes a profiles backfill)."
-      );
-      return;
-    }
-    showStatus("Display name saved.");
+    const result = profileUpdateStatus(data, error);
+    showStatus(result.message);
+    if (!result.ok) return;
     await refreshAppData();
   });
 

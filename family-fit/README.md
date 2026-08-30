@@ -20,6 +20,8 @@ Invite-only family weight-loss / healthy-living competition mini-app, served as 
 2. Paste the contents of [`schema.sql`](./schema.sql) and run it.
 3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**.
 
+Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name or log weigh-ins.
+
 ### 3. Disable public self-signup (invite-only)
 
 1. Go to **Authentication → Providers → Email**.
@@ -45,7 +47,7 @@ window.FAMILY_FIT_CONFIG = {
 
 1. **Authentication → Users → Invite user** (or “Add user” / invite by email).
 2. Send the invite email for each family member.
-3. When they accept and sign in, a `profiles` row is created automatically (see trigger in `schema.sql`).
+3. New invites get a `profiles` row from the auth trigger in `schema.sql`. If someone was invited before you ran the schema, re-run `schema.sql` so the backfill creates their profile.
 4. They can set a friendly display name in the app after sign-in.
 
 Optional: when inviting via the Admin API / dashboard, set user metadata `display_name` so the profile starts with a nicer name.
