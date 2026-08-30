@@ -3,7 +3,7 @@ import {
   competitionSinceDay,
   localDateISO,
   profileUpdateStatus,
-  weightLineFromSeries,
+  weightSummaryFromSeries,
 } from "./board-math.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
@@ -33,15 +33,27 @@ function todayISO() {
   return localDateISO();
 }
 
-function showStatus(msg) {
-  els.status.hidden = !msg;
-  els.status.textContent = msg || "";
-  if (msg) {
-    clearTimeout(showStatus._t);
-    showStatus._t = setTimeout(() => {
-      els.status.hidden = true;
-    }, 3200);
+function showStatus(msg, kind = "success") {
+  const el = els.status;
+  if (!msg) {
+    el.hidden = true;
+    el.textContent = "";
+    el.classList.remove("toast--success", "toast--error", "is-leaving");
+    return;
   }
+  clearTimeout(showStatus._hide);
+  clearTimeout(showStatus._clear);
+  el.classList.remove("is-leaving", "toast--success", "toast--error");
+  el.classList.add(kind === "error" ? "toast--error" : "toast--success");
+  el.textContent = msg;
+  el.hidden = false;
+  showStatus._hide = setTimeout(() => {
+    el.classList.add("is-leaving");
+    showStatus._clear = setTimeout(() => {
+      el.hidden = true;
+      el.classList.remove("is-leaving", "toast--success", "toast--error");
+    }, 220);
+  }, 3200);
 }
 
 function setAuthError(msg) {
@@ -59,6 +71,19 @@ function seedDates() {
   for (const form of [els.weightForm, els.exerciseForm]) {
     const input = form.querySelector('[name="recorded_on"]');
     if (input && !input.value) input.value = today;
+  }
+}
+
+function setSubmitting(form, busy) {
+  const btn = form.querySelector('button[type="submit"]');
+  if (!btn) return;
+  if (busy) {
+    btn.dataset.label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.label) btn.textContent = btn.dataset.label;
   }
 }
 
@@ -86,6 +111,11 @@ async function loadProfile() {
   if (name) {
     els.whoami.textContent = `${name} · ${session.user.email}`;
   }
+}
+
+function deltaClass(delta) {
+  if (delta == null || Number.isNaN(delta) || delta === 0) return "";
+  return delta < 0 ? " stat-value--delta-down" : " stat-value--delta-up";
 }
 
 async function loadBoard() {
@@ -136,20 +166,45 @@ async function loadBoard() {
     );
   }
 
-  const cards = profiles.map((p) => {
+  const members = profiles.map((p) => {
     const series = weighByUser.get(p.id) || [];
-    const weightLine = weightLineFromSeries(series);
+    const weight = weightSummaryFromSeries(series);
     const mins = minutesByUser.get(p.id) || 0;
-    const exerciseLine =
-      mins > 0
-        ? `${mins} exercise minutes in the last 30 days`
+    return {
+      id: p.id,
+      name: p.display_name || "Family member",
+      weight,
+      mins,
+    };
+  });
+
+  // Motivating scan order: most exercise minutes first, then name.
+  members.sort((a, b) => {
+    if (b.mins !== a.mins) return b.mins - a.mins;
+    return a.name.localeCompare(b.name);
+  });
+
+  const cards = members.map((m, i) => {
+    const exerciseText =
+      m.mins > 0
+        ? `${m.mins} minutes in the last 30 days`
         : "No exercise logged in the last 30 days";
+    const weightClass = deltaClass(m.weight.delta);
 
     return `<article class="member-card">
-      <div class="member-name">${escapeHtml(p.display_name || "Family member")}</div>
-      <div class="member-stats">
-        <span>${escapeHtml(weightLine)}</span>
-        <span>${escapeHtml(exerciseLine)}</span>
+      <div class="member-rank" aria-hidden="true">${i + 1}</div>
+      <div class="member-body">
+        <div class="member-name">${escapeHtml(m.name)}</div>
+        <div class="member-stats">
+          <div class="stat-line">
+            <span class="stat-label">Weight</span>
+            <span class="stat-value${weightClass}">${escapeHtml(m.weight.text)}</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-label">Exercise</span>
+            <span class="stat-value">${escapeHtml(exerciseText)}</span>
+          </div>
+        </div>
       </div>
     </article>`;
   });
@@ -234,70 +289,95 @@ function wireForms() {
   els.authForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     setAuthError("");
+    setSubmitting(els.authForm, true);
     const fd = new FormData(els.authForm);
     const email = String(fd.get("email") || "").trim();
     const password = String(fd.get("password") || "");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setAuthError(error.message);
+    } finally {
+      setSubmitting(els.authForm, false);
+    }
   });
 
   els.signOut.addEventListener("click", async () => {
-    await supabase.auth.signOut();
+    els.signOut.disabled = true;
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      els.signOut.disabled = false;
+    }
   });
 
   els.profileForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const display_name = String(els.profileForm.display_name.value || "").trim();
-    const { data, error } = await supabase
-      .from("profiles")
-      .update({ display_name })
-      .eq("id", session.user.id)
-      .select("id");
-    const result = profileUpdateStatus(data, error);
-    showStatus(result.message);
-    if (!result.ok) return;
-    await refreshAppData();
+    setSubmitting(els.profileForm, true);
+    try {
+      const display_name = String(els.profileForm.display_name.value || "").trim();
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ display_name })
+        .eq("id", session.user.id)
+        .select("id");
+      const result = profileUpdateStatus(data, error);
+      showStatus(result.message, result.ok ? "success" : "error");
+      if (!result.ok) return;
+      await refreshAppData();
+    } finally {
+      setSubmitting(els.profileForm, false);
+    }
   });
 
   els.weightForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const fd = new FormData(els.weightForm);
-    const payload = {
-      user_id: session.user.id,
-      weight_lbs: Number(fd.get("weight_lbs")),
-      recorded_on: String(fd.get("recorded_on")),
-      note: String(fd.get("note") || "").trim() || null,
-    };
-    const { error } = await supabase.from("weigh_ins").insert(payload);
-    if (error) {
-      showStatus(error.message);
-      return;
+    setSubmitting(els.weightForm, true);
+    try {
+      const fd = new FormData(els.weightForm);
+      const payload = {
+        user_id: session.user.id,
+        weight_lbs: Number(fd.get("weight_lbs")),
+        recorded_on: String(fd.get("recorded_on")),
+        note: String(fd.get("note") || "").trim() || null,
+      };
+      const { error } = await supabase.from("weigh_ins").insert(payload);
+      if (error) {
+        showStatus(error.message, "error");
+        return;
+      }
+      els.weightForm.reset();
+      seedDates();
+      showStatus("Weigh-in logged.", "success");
+      await refreshAppData();
+    } finally {
+      setSubmitting(els.weightForm, false);
     }
-    els.weightForm.reset();
-    seedDates();
-    showStatus("Weigh-in logged.");
-    await refreshAppData();
   });
 
   els.exerciseForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const fd = new FormData(els.exerciseForm);
-    const payload = {
-      user_id: session.user.id,
-      activity: String(fd.get("activity") || "").trim(),
-      duration_minutes: Number(fd.get("duration_minutes")),
-      recorded_on: String(fd.get("recorded_on")),
-      note: String(fd.get("note") || "").trim() || null,
-    };
-    const { error } = await supabase.from("exercise_logs").insert(payload);
-    if (error) {
-      showStatus(error.message);
-      return;
+    setSubmitting(els.exerciseForm, true);
+    try {
+      const fd = new FormData(els.exerciseForm);
+      const payload = {
+        user_id: session.user.id,
+        activity: String(fd.get("activity") || "").trim(),
+        duration_minutes: Number(fd.get("duration_minutes")),
+        recorded_on: String(fd.get("recorded_on")),
+        note: String(fd.get("note") || "").trim() || null,
+      };
+      const { error } = await supabase.from("exercise_logs").insert(payload);
+      if (error) {
+        showStatus(error.message, "error");
+        return;
+      }
+      els.exerciseForm.reset();
+      seedDates();
+      showStatus("Exercise logged.", "success");
+      await refreshAppData();
+    } finally {
+      setSubmitting(els.exerciseForm, false);
     }
-    els.exerciseForm.reset();
-    seedDates();
-    showStatus("Exercise logged.");
-    await refreshAppData();
   });
 }
 

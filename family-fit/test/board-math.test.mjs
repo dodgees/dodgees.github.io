@@ -5,6 +5,7 @@ import {
   localDateISO,
   profileUpdateStatus,
   weightLineFromSeries,
+  weightSummaryFromSeries,
 } from "../board-math.js";
 
 describe("competitionSinceDay (local calendar)", () => {
@@ -72,6 +73,37 @@ describe("weightLineFromSeries (stable same-day order)", () => {
     ]);
     // earliest same-day is 190 at 09:00, latest overall 195 → +5.0
     assert.equal(flippedInput, "190 → 195 lbs (+5.0 over 30 days)");
+  });
+});
+
+describe("weightSummaryFromSeries", () => {
+  it("exposes delta for range summaries", () => {
+    const summary = weightSummaryFromSeries([
+      {
+        weight_lbs: 200,
+        recorded_on: "2026-08-20",
+        created_at: "2026-08-20T10:00:00Z",
+      },
+      {
+        weight_lbs: 195,
+        recorded_on: "2026-08-25",
+        created_at: "2026-08-25T12:00:00Z",
+      },
+    ]);
+    assert.equal(summary.kind, "range");
+    assert.equal(summary.delta, -5);
+    assert.equal(summary.text, weightLineFromSeries([
+      {
+        weight_lbs: 200,
+        recorded_on: "2026-08-20",
+        created_at: "2026-08-20T10:00:00Z",
+      },
+      {
+        weight_lbs: 195,
+        recorded_on: "2026-08-25",
+        created_at: "2026-08-25T12:00:00Z",
+      },
+    ]));
   });
 });
 
