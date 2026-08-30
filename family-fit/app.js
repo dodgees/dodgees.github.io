@@ -39,8 +39,8 @@ let supabase = null;
 let session = null;
 /** @type {"weight"|"exercise"|null} */
 let activeLog = null;
-/** @type {"weight"|"exercise"|null} */
-let highlightKind = null;
+/** @type {{ kind: "weight"|"exercise", id: string } | null} */
+let highlightTarget = null;
 
 function todayISO() {
   return localDateISO();
@@ -282,8 +282,8 @@ async function loadBoard() {
 }
 
 async function loadMyEntries() {
-  const markKind = highlightKind;
-  highlightKind = null;
+  const mark = highlightTarget;
+  highlightTarget = null;
 
   els.myEntries.innerHTML = '<p class="muted">Loading…</p>';
   const uid = session.user.id;
@@ -291,13 +291,13 @@ async function loadMyEntries() {
   const [w, e] = await Promise.all([
     supabase
       .from("weigh_ins")
-      .select("weight_lbs, recorded_on, note, created_at")
+      .select("id, weight_lbs, recorded_on, note, created_at")
       .eq("user_id", uid)
       .order("recorded_on", { ascending: false })
       .limit(8),
     supabase
       .from("exercise_logs")
-      .select("activity, duration_minutes, recorded_on, note, created_at")
+      .select("id, activity, duration_minutes, recorded_on, note, created_at")
       .eq("user_id", uid)
       .order("recorded_on", { ascending: false })
       .limit(8),
@@ -312,6 +312,7 @@ async function loadMyEntries() {
   for (const row of w.data || []) {
     rows.push({
       kind: "weight",
+      id: row.id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
       html: `<div class="entry-row" data-kind="weight"><span>Weight ${escapeHtml(String(row.weight_lbs))} lbs${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
     });
@@ -319,6 +320,7 @@ async function loadMyEntries() {
   for (const row of e.data || []) {
     rows.push({
       kind: "exercise",
+      id: row.id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
       html: `<div class="entry-row" data-kind="exercise"><span>${escapeHtml(row.activity)} · ${escapeHtml(String(row.duration_minutes))} min${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
     });
@@ -335,7 +337,7 @@ async function loadMyEntries() {
   els.myEntries.innerHTML = rows
     .slice(0, 12)
     .map((r) => {
-      if (markKind && !marked && r.kind === markKind) {
+      if (mark && !marked && r.kind === mark.kind && r.id === mark.id) {
         marked = true;
         return r.html.replace('class="entry-row"', 'class="entry-row is-fresh"');
       }
@@ -447,14 +449,18 @@ function wireForms() {
         recorded_on: String(fd.get("recorded_on")),
         note: String(fd.get("note") || "").trim() || null,
       };
-      const { error } = await supabase.from("weigh_ins").insert(payload);
+      const { data, error } = await supabase
+        .from("weigh_ins")
+        .insert(payload)
+        .select("id")
+        .single();
       if (error) {
         showStatus(error.message, "error");
         return;
       }
       els.weightForm.reset();
       seedDates();
-      highlightKind = "weight";
+      if (data?.id) highlightTarget = { kind: "weight", id: data.id };
       collapseLogForms();
       showStatus("Weigh-in logged.", "success");
       await refreshAppData();
@@ -475,14 +481,18 @@ function wireForms() {
         recorded_on: String(fd.get("recorded_on")),
         note: String(fd.get("note") || "").trim() || null,
       };
-      const { error } = await supabase.from("exercise_logs").insert(payload);
+      const { data, error } = await supabase
+        .from("exercise_logs")
+        .insert(payload)
+        .select("id")
+        .single();
       if (error) {
         showStatus(error.message, "error");
         return;
       }
       els.exerciseForm.reset();
       seedDates();
-      highlightKind = "exercise";
+      if (data?.id) highlightTarget = { kind: "exercise", id: data.id };
       collapseLogForms();
       showStatus("Exercise logged.", "success");
       await refreshAppData();
