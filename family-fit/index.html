@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Family Fit</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="app-header">
+      <p class="eyebrow"><a href="/">Erik Dodge</a> · Family Fit</p>
+      <h1>Family Fit</h1>
+      <p class="lede">Our family’s healthy-living competition — log weight and exercise, cheer each other on.</p>
+    </header>
+
+    <section id="setup-banner" class="banner" hidden>
+      <h2>Setup needed</h2>
+      <p>Supabase URL and anon key are not configured yet. See <code>family-fit/README.md</code> — captain fills <code>config.js</code> after creating the project.</p>
+    </section>
+
+    <section id="auth-panel" class="panel" hidden>
+      <h2>Sign in</h2>
+      <p class="hint">Invite-only. Use the email invite the captain sent you.</p>
+      <form id="sign-in-form" class="stack">
+        <label>
+          Email
+          <input type="email" name="email" required autocomplete="username">
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" required autocomplete="current-password" minlength="6">
+        </label>
+        <button type="submit">Sign in</button>
+      </form>
+      <p id="auth-error" class="error" hidden></p>
+    </section>
+
+    <section id="app-panel" hidden>
+      <div class="toolbar">
+        <p id="whoami" class="whoami"></p>
+        <button type="button" id="sign-out-btn" class="btn-quiet">Sign out</button>
+      </div>
+
+      <section class="panel">
+        <h2>Your profile</h2>
+        <form id="profile-form" class="row-form">
+          <label>
+            Display name
+            <input type="text" name="display_name" required maxlength="40" autocomplete="nickname">
+          </label>
+          <button type="submit">Save</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Log weight</h2>
+        <form id="weight-form" class="stack">
+          <div class="row">
+            <label>
+              Weight (lbs)
+              <input type="number" name="weight_lbs" required min="1" max="999" step="0.1">
+            </label>
+            <label>
+              Date
+              <input type="date" name="recorded_on" required>
+            </label>
+          </div>
+          <label>
+            Note <span class="optional">(optional)</span>
+            <input type="text" name="note" maxlength="120">
+          </label>
+          <button type="submit">Add weigh-in</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Log exercise</h2>
+        <form id="exercise-form" class="stack">
+          <div class="row">
+            <label>
+              Activity
+              <input type="text" name="activity" required maxlength="80" placeholder="Walk, bike, gym…">
+            </label>
+            <label>
+              Minutes
+              <input type="number" name="duration_minutes" required min="1" max="1440" step="1">
+            </label>
+          </div>
+          <label>
+            Date
+            <input type="date" name="recorded_on" required>
+          </label>
+          <label>
+            Note <span class="optional">(optional)</span>
+            <input type="text" name="note" maxlength="120">
+          </label>
+          <button type="submit">Add exercise</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Competition board</h2>
+        <p class="hint">Progress for signed-in family — latest weigh-ins and exercise minutes recently logged.</p>
+        <div id="board-error" class="error" hidden></div>
+        <div id="leaderboard" class="leaderboard" aria-live="polite">
+          <p class="muted">Loading…</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Your recent entries</h2>
+        <div id="my-entries" class="entries">
+          <p class="muted">Loading…</p>
+        </div>
+      </section>
+    </section>
+
+    <p id="form-status" class="status" role="status" hidden></p>
+
+    <footer class="app-footer">
+      <p><a href="/">← Back to erikdodge.com</a></p>
+    </footer>
+  </main>
+
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
