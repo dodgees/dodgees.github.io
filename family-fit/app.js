@@ -23,12 +23,15 @@ const els = {
 let supabase = null;
 let session = null;
 
-function todayISO() {
-  const d = new Date();
+function localDateISO(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function todayISO() {
+  return localDateISO();
 }
 
 function showStatus(msg) {
@@ -92,15 +95,16 @@ async function loadBoard() {
 
   const since = new Date();
   since.setDate(since.getDate() - 30);
-  const sinceDay = since.toISOString().slice(0, 10);
+  const sinceDay = localDateISO(since);
 
   const [profilesRes, weighRes, exerciseRes] = await Promise.all([
     supabase.from("profiles").select("id, display_name").order("display_name"),
     supabase
       .from("weigh_ins")
-      .select("user_id, weight_lbs, recorded_on")
+      .select("user_id, weight_lbs, recorded_on, created_at")
       .gte("recorded_on", sinceDay)
-      .order("recorded_on", { ascending: true }),
+      .order("recorded_on", { ascending: true })
+      .order("created_at", { ascending: true }),
     supabase
       .from("exercise_logs")
       .select("user_id, duration_minutes, recorded_on, activity")
@@ -256,12 +260,19 @@ function wireForms() {
   els.profileForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const display_name = String(els.profileForm.display_name.value || "").trim();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .update({ display_name })
-      .eq("id", session.user.id);
+      .eq("id", session.user.id)
+      .select("id");
     if (error) {
       showStatus(error.message);
+      return;
+    }
+    if (!data?.length) {
+      showStatus(
+        "No profile row for this account. Ask the captain to re-run family-fit/schema.sql (includes a profiles backfill)."
+      );
       return;
     }
     showStatus("Display name saved.");
