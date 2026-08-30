@@ -94,9 +94,9 @@ body {
   margin: 0 auto;
   padding:
     max(1.5rem, var(--safe-top))
-    max(1.15rem, var(--safe-left))
+    max(1.15rem, var(--safe-right))
     max(3.5rem, calc(var(--safe-bottom) + 2.5rem))
-    max(1.15rem, var(--safe-right));
+    max(1.15rem, var(--safe-left));
   width: 100%;
 }
 
@@ -578,7 +578,7 @@ code {
 
 @media (min-width: 480px) {
   .page {
-    padding-inline: max(1.5rem, var(--safe-left));
+    padding-inline: max(1.5rem, var(--safe-left)) max(1.5rem, var(--safe-right));
   }
 
   .btn-block {
