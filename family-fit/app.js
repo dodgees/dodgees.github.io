@@ -112,7 +112,9 @@ function setProfileEditorOpen(open) {
 }
 
 function setLogMode(mode, { scroll = true, focus = true } = {}) {
-  activeLog = mode === "weight" || mode === "exercise" ? mode : null;
+  const next = mode === "weight" || mode === "exercise" ? mode : null;
+  const entering = Boolean(next && next !== activeLog);
+  activeLog = next;
 
   const weightOpen = activeLog === "weight";
   const exerciseOpen = activeLog === "exercise";
@@ -127,7 +129,9 @@ function setLogMode(mode, { scroll = true, focus = true } = {}) {
 
   if (!activeLog) return;
 
-  seedDates();
+  if (entering) {
+    seedDates();
+  }
 
   if (scroll) {
     els.logSection.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -278,6 +282,9 @@ async function loadBoard() {
 }
 
 async function loadMyEntries() {
+  const markKind = highlightKind;
+  highlightKind = null;
+
   els.myEntries.innerHTML = '<p class="muted">Loading…</p>';
   const uid = session.user.id;
 
@@ -324,20 +331,19 @@ async function loadMyEntries() {
     return;
   }
 
-  const markKind = highlightKind;
-  highlightKind = null;
-
+  let marked = false;
   els.myEntries.innerHTML = rows
     .slice(0, 12)
-    .map((r, i) => {
-      if (markKind && i === 0 && r.kind === markKind) {
+    .map((r) => {
+      if (markKind && !marked && r.kind === markKind) {
+        marked = true;
         return r.html.replace('class="entry-row"', 'class="entry-row is-fresh"');
       }
       return r.html;
     })
     .join("");
 
-  if (markKind) {
+  if (marked) {
     const fresh = els.myEntries.querySelector(".entry-row.is-fresh");
     fresh?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
