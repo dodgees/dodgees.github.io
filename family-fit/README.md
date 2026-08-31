@@ -76,6 +76,15 @@ npx --yes serve -l 5500 .
 
 If `config.js` is empty, the app shows a setup message instead of talking to Supabase.
 
+## Add to Home Screen (PWA)
+
+Family Fit ships a web app manifest and icons so members can install it from a phone browser (useful when opening invite links from texts).
+
+- **Android (Chrome):** open `/family-fit/`, tap the menu (⋮), then **Install app** or **Add to Home screen**.
+- **iOS (Safari):** open `/family-fit/`, tap **Share**, then **Add to Home Screen**. The icon should show as **Family Fit** with the green dumbbell icon.
+
+Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icons/`](./icons/).
+
 ## What the app does
 
 | Feature | Who |
