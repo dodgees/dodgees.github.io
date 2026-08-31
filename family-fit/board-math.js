@@ -39,6 +39,8 @@ export function formatWeightDelta(delta) {
 /**
  * Structured weigh-in summary for the competition board.
  * Stable order: recorded_on asc, then created_at asc.
+ * Board cards use primary (glance delta/latest) and secondary (start→latest);
+ * text remains the legacy full sentence.
  */
 export function weightSummaryFromSeries(series) {
   const sorted = sortWeighSeries(series);
@@ -85,7 +87,9 @@ export function weightSummaryFromSeries(series) {
 }
 
 /**
- * Sort competition-board members.
+ * Sort competition-board members for display order.
+ * exercise: most minutes first, then name.
+ * weight: most weight loss (most negative delta) first; null/NaN deltas last; then name.
  * @param {"exercise"|"weight"} mode
  * @param {Array<{ name: string, mins: number, weight: { delta: number|null } }>} members
  */
@@ -135,8 +139,8 @@ export function writeBoardSortPreference(mode, storage = globalThis.localStorage
 }
 
 /**
- * Stable weigh-in series: recorded_on asc, then created_at asc.
- * Returns the weight line shown on the competition board.
+ * Legacy full-sentence weight summary (`weightSummaryFromSeries(...).text`).
+ * Board cards render primary/secondary instead.
  */
 export function weightLineFromSeries(series) {
   return weightSummaryFromSeries(series).text;

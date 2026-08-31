@@ -82,7 +82,7 @@ If `config.js` is empty, the app shows a setup message instead of talking to Sup
 | Sign in | Invited family only |
 | Log weight | Own entries only (write) |
 | Log exercise | Own entries only (write) |
-| Competition board | Signed-in family can read everyone’s progress |
+| Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
 
 Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for `anon`).
 
