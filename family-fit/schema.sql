@@ -115,7 +115,10 @@ create policy "profiles_update_own"
   using (auth.uid() = id)
   with check (
     auth.uid() = id
-    and (avatar_path is null or avatar_path like auth.uid()::text || '/%')
+    and (
+      avatar_path is null
+      or avatar_path ~ ('^' || auth.uid()::text || '/avatar\.(webp|jpe?g|png)$')
+    )
   );
 
 -- No insert/delete for clients; profile rows come from the auth trigger or the backfill above.
