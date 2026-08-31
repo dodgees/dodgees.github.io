@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  boardMemberAccessibleName,
   competitionSinceDay,
   formatWeightDelta,
   localDateISO,
@@ -8,6 +9,7 @@ import {
   readBoardSortPreference,
   sortBoardMembers,
   weightLineFromSeries,
+  weightPhraseForA11y,
   weightSummaryFromSeries,
   writeBoardSortPreference,
   BOARD_SORT_STORAGE_KEY,
@@ -110,6 +112,49 @@ describe("formatWeightDelta", () => {
     assert.equal(formatWeightDelta(2.5), "+2.5 lbs");
     assert.equal(formatWeightDelta(0), "0.0 lbs");
     assert.equal(formatWeightDelta(null), null);
+  });
+});
+
+describe("boardMemberAccessibleName", () => {
+  it("builds a coherent ranked name with weight and exercise", () => {
+    const name = boardMemberAccessibleName(1, {
+      name: "Alex",
+      mins: 30,
+      weight: { kind: "range", delta: -5, latestLbs: 195, startLbs: 200 },
+    });
+    assert.equal(name, "1. Alex, down 5 pounds, 30 minutes exercise");
+  });
+
+  it("appends a self marker when isSelf is true", () => {
+    const name = boardMemberAccessibleName(
+      2,
+      {
+        name: "Erik",
+        mins: 30,
+        weight: { kind: "range", delta: -3, latestLbs: 197, startLbs: 200 },
+      },
+      true
+    );
+    assert.equal(name, "2. Erik, down 3 pounds, 30 minutes exercise, you");
+  });
+
+  it("handles empty weigh-ins and singular minute", () => {
+    assert.equal(
+      boardMemberAccessibleName(2, {
+        name: "Bea",
+        mins: 1,
+        weight: { kind: "empty", delta: null },
+      }),
+      "2. Bea, no weigh-ins, 1 minute exercise"
+    );
+    assert.equal(
+      weightPhraseForA11y({ kind: "single", delta: null, latestLbs: 180, startLbs: 180 }),
+      "180 pounds"
+    );
+    assert.equal(
+      weightPhraseForA11y({ kind: "range", delta: 2.5 }),
+      "up 2.5 pounds"
+    );
   });
 });
 

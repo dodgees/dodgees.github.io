@@ -49,6 +49,7 @@ window.FAMILY_FIT_CONFIG = {
 2. Send the invite email for each family member.
 3. New invites get a `profiles` row from the auth trigger in `schema.sql`. If someone was invited before you ran the schema, re-run `schema.sql` so the backfill creates their profile.
 4. They can set a friendly display name in the app after sign-in.
+5. Forgotten passwords: send a fresh invite from the same Users screen — the app has no self-serve reset.
 
 Optional: when inviting via the Admin API / dashboard, set user metadata `display_name` so the profile starts with a nicer name.
 
@@ -79,7 +80,7 @@ If `config.js` is empty, the app shows a setup message instead of talking to Sup
 
 | Feature | Who |
 | --- | --- |
-| Sign in | Invited family only |
+| Sign in | Invited family only; password recovery is a fresh captain invite (no self-serve reset) |
 | Log weight | Own entries only (write) |
 | Log exercise | Own entries only (write) |
 | Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |

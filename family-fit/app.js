@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
+  boardMemberAccessibleName,
   competitionSinceDay,
   localDateISO,
   profileUpdateStatus,
@@ -68,12 +69,17 @@ function showStatus(msg, kind = "success") {
   clearTimeout(showStatus._clear);
   el.classList.remove("is-leaving", "toast--success", "toast--error");
   el.classList.add(kind === "error" ? "toast--error" : "toast--success");
-  el.textContent = msg;
+  // Unhide before text so aria-live polite can announce submit success.
   el.hidden = false;
+  el.textContent = "";
+  requestAnimationFrame(() => {
+    el.textContent = msg;
+  });
   showStatus._hide = setTimeout(() => {
     el.classList.add("is-leaving");
     showStatus._clear = setTimeout(() => {
       el.hidden = true;
+      el.textContent = "";
       el.classList.remove("is-leaving", "toast--success", "toast--error");
     }, 220);
   }, 3200);
@@ -243,6 +249,7 @@ function renderBoard() {
   const maxMins = Math.max(0, ...ordered.map((m) => m.mins));
 
   const cards = ordered.map((m, i) => {
+    const rank = i + 1;
     const isSelf = selfId && m.id === selfId;
     const weightClass = deltaClass(m.weight.delta);
     const exerciseLabel = m.mins > 0 ? `${m.mins} min` : "0 min";
@@ -253,24 +260,27 @@ function renderBoard() {
     const selfAttr = isSelf ? ' data-self="true"' : "";
     const selfClass = isSelf ? " is-self" : "";
     const youBadge = isSelf
-      ? '<span class="member-you">You</span>'
+      ? '<span class="member-you" aria-hidden="true">You</span>'
       : "";
+    const a11yName = boardMemberAccessibleName(rank, m, isSelf);
 
-    return `<article class="member-card${selfClass}"${selfAttr}>
-      <div class="member-rank" aria-hidden="true">${i + 1}</div>
-      <div class="member-body">
-        <div class="member-top">
-          <div class="member-name">${escapeHtml(m.name)}</div>
-          ${youBadge}
+    return `<li class="leaderboard-item">
+      <article class="member-card${selfClass}"${selfAttr} aria-label="${escapeHtml(a11yName)}">
+        <div class="member-rank" aria-hidden="true">${rank}</div>
+        <div class="member-body" aria-hidden="true">
+          <div class="member-top">
+            <div class="member-name">${escapeHtml(m.name)}</div>
+            ${youBadge}
+          </div>
+          <div class="member-delta${weightClass}">${escapeHtml(m.weight.primary)}</div>
+          <div class="member-range">${escapeHtml(m.weight.secondary)}</div>
+          <div class="member-exercise" title="${m.mins} minutes in the last 30 days">
+            <span class="exercise-chip">${escapeHtml(exerciseLabel)}</span>
+            <span class="exercise-bar"><span class="exercise-bar__fill" style="width:${barPct}%"></span></span>
+          </div>
         </div>
-        <div class="member-delta${weightClass}">${escapeHtml(m.weight.primary)}</div>
-        <div class="member-range">${escapeHtml(m.weight.secondary)}</div>
-        <div class="member-exercise" title="${m.mins} minutes in the last 30 days">
-          <span class="exercise-chip">${escapeHtml(exerciseLabel)}</span>
-          <span class="exercise-bar" aria-hidden="true"><span class="exercise-bar__fill" style="width:${barPct}%"></span></span>
-        </div>
-      </div>
-    </article>`;
+      </article>
+    </li>`;
   });
 
   const soloNudge =
@@ -284,7 +294,9 @@ function renderBoard() {
         })
       : "";
 
-  els.leaderboard.innerHTML = soloNudge + cards.join("");
+  els.leaderboard.innerHTML =
+    soloNudge +
+    `<ul class="leaderboard-list" aria-label="Competition board ranked list">${cards.join("")}</ul>`;
 }
 
 async function loadBoard() {

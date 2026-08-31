@@ -192,6 +192,21 @@ h2 {
   margin-top: 0.25rem;
 }
 
+.auth-welcome {
+  font-size: 1.02rem;
+  color: var(--text);
+  margin-bottom: 0.85rem;
+  line-height: 1.5;
+}
+
+.auth-reset-hint {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 0.85rem;
+  margin-bottom: 0;
+  line-height: 1.45;
+}
+
 .hint,
 .muted {
   font-size: 0.9rem;
@@ -300,6 +315,7 @@ h2 {
 
 input {
   font: inherit;
+  font-size: 1rem; /* 16px+ — avoids iOS zoom; keeps auth fields readable */
   font-weight: 400;
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--divider);
@@ -553,6 +569,20 @@ body.has-log-dock .toast {
   gap: 0.65rem;
 }
 
+.leaderboard-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+}
+
+.leaderboard-item {
+  margin: 0;
+  padding: 0;
+}
+
 .board-sort {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -616,12 +646,12 @@ body.has-log-dock .toast {
   box-shadow: 0 0 0 1px var(--accent-soft), var(--shadow);
 }
 
-.member-card:nth-child(1) { animation-delay: 0.02s; }
-.member-card:nth-child(2) { animation-delay: 0.06s; }
-.member-card:nth-child(3) { animation-delay: 0.1s; }
-.member-card:nth-child(4) { animation-delay: 0.14s; }
-.member-card:nth-child(5) { animation-delay: 0.18s; }
-.member-card:nth-child(n + 6) { animation-delay: 0.22s; }
+.leaderboard-list > li:nth-child(1) .member-card { animation-delay: 0.02s; }
+.leaderboard-list > li:nth-child(2) .member-card { animation-delay: 0.06s; }
+.leaderboard-list > li:nth-child(3) .member-card { animation-delay: 0.1s; }
+.leaderboard-list > li:nth-child(4) .member-card { animation-delay: 0.14s; }
+.leaderboard-list > li:nth-child(5) .member-card { animation-delay: 0.18s; }
+.leaderboard-list > li:nth-child(n + 6) .member-card { animation-delay: 0.22s; }
 
 @keyframes board-reveal {
   from {
