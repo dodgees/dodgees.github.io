@@ -21,6 +21,11 @@ export const AVATAR_ACCEPTED_TYPES = Object.freeze([
 
 const ACCEPTED_SET = new Set(AVATAR_ACCEPTED_TYPES);
 const ACCEPTED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+const EXTENSION_FALLBACK_MIMES = new Set([
+  "",
+  "application/octet-stream",
+  "image/jpg",
+]);
 
 function hasAcceptedAvatarExtension(file) {
   const name = String(file.name || "").toLowerCase();
@@ -31,7 +36,12 @@ function hasAcceptedAvatarExtension(file) {
 
 function isAcceptedAvatarType(file) {
   if (ACCEPTED_SET.has(file.type)) return true;
-  if (!file.type && hasAcceptedAvatarExtension(file)) return true;
+  if (
+    EXTENSION_FALLBACK_MIMES.has(file.type || "") &&
+    hasAcceptedAvatarExtension(file)
+  ) {
+    return true;
+  }
   return false;
 }
 

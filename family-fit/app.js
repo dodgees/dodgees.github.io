@@ -400,7 +400,6 @@ async function loadProfile() {
     els.whoami.textContent = `${name} · ${session.user.email}`;
   }
   await resolveAvatarUrls(myAvatarPath ? [myAvatarPath] : [], { retainPaths: true });
-  syncProfileAvatarUi();
 }
 
 function deltaClass(delta) {
@@ -676,6 +675,7 @@ function escapeHtml(str) {
 
 async function refreshAppData() {
   await Promise.all([loadProfile(), loadBoard(), loadMyEntries()]);
+  syncProfileAvatarUi();
 }
 
 async function onSession(next) {

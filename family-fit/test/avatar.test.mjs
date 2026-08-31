@@ -32,13 +32,29 @@ describe("validateAvatarFile", () => {
     );
   });
 
-  it("accepts known extensions when MIME type is missing", () => {
+  it("accepts known extensions when MIME type is missing or generic", () => {
     assert.equal(
       validateAvatarFile({ type: "", name: "photo.jpg", size: 1024 }),
       null
     );
     assert.equal(
       validateAvatarFile({ name: "photo.JPEG", size: 1024 }),
+      null
+    );
+    assert.equal(
+      validateAvatarFile({
+        type: "application/octet-stream",
+        name: "photo.jpg",
+        size: 1024,
+      }),
+      null
+    );
+    assert.equal(
+      validateAvatarFile({
+        type: "image/jpg",
+        name: "photo.jpg",
+        size: 1024,
+      }),
       null
     );
   });
