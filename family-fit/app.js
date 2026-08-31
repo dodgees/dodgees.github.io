@@ -244,6 +244,22 @@ function reconcileMyAvatarPathFromBoard() {
   if (self) myAvatarPath = self.avatarPath;
 }
 
+async function patchSelfBoardAvatar() {
+  const selfId = session?.user?.id;
+  if (!selfId || !boardMembers) return;
+  const idx = boardMembers.findIndex((m) => m.id === selfId);
+  if (idx < 0) return;
+  const avatarPath = myAvatarPath;
+  if (avatarPath && !avatarUrlByPath.has(avatarPath)) {
+    await resolveAvatarUrls([avatarPath], { retainPaths: true });
+  }
+  boardMembers[idx] = {
+    ...boardMembers[idx],
+    avatarPath,
+    avatarUrl: avatarPath ? avatarUrlByPath.get(avatarPath) || null : null,
+  };
+}
+
 function syncProfileAvatarUi() {
   const url = myAvatarPath ? avatarUrlByPath.get(myAvatarPath) || null : null;
   renderAvatarSlot(els.profileAvatarInitials, els.profileAvatarImg, {
@@ -543,6 +559,7 @@ function commitLoadBoardRender(generation) {
 
 async function loadBoard() {
   const generation = ++loadBoardGeneration;
+  const avatarRevAtStart = avatarRevision;
   setBoardError("");
   els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
   boardMembers = null;
@@ -583,7 +600,11 @@ async function loadBoard() {
   }
 
   if (loadBoardResultIsStale(generation)) return;
-  await resolveAvatarUrls(profiles.map((p) => p.avatar_path));
+  const avatarPaths = profiles.map((p) => p.avatar_path);
+  if (myAvatarPath && !avatarPaths.includes(myAvatarPath)) {
+    avatarPaths.push(myAvatarPath);
+  }
+  await resolveAvatarUrls(avatarPaths);
   if (loadBoardResultIsStale(generation)) return;
 
   const weighByUser = new Map();
@@ -614,6 +635,11 @@ async function loadBoard() {
       avatarUrl: avatarPath ? avatarUrlByPath.get(avatarPath) || null : null,
     };
   });
+
+  if (avatarRevAtStart !== avatarRevision) {
+    await patchSelfBoardAvatar();
+    if (loadBoardResultIsStale(generation)) return;
+  }
 
   commitLoadBoardRender(generation);
   syncSortControls();
@@ -721,6 +747,9 @@ async function refreshAppData() {
   await Promise.all([loadProfile(), loadBoard(), loadMyEntries()]);
   if (avatarRevAtStart === avatarRevision) {
     reconcileMyAvatarPathFromBoard();
+  }
+  if (myAvatarPath) {
+    await resolveAvatarUrls([myAvatarPath], { retainPaths: true });
   }
   syncProfileAvatarUi();
 }
