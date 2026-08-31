@@ -599,11 +599,9 @@ async function loadBoard() {
       )
     ) {
       boardMembers = previousBoardMembers;
-      if (avatarRevAtStart !== avatarRevision) {
-        await patchSelfBoardAvatar();
-      }
+      await patchSelfBoardAvatar();
       renderBoard();
-      return false;
+      return true;
     }
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(err.message);
