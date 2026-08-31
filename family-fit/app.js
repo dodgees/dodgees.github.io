@@ -76,6 +76,8 @@ let avatarRevision = 0;
 let loadBoardGeneration = 0;
 /** Last loadBoard generation that rendered boardMembers. */
 let loadBoardRenderedGeneration = 0;
+/** Last committed board snapshot for keep-board when overlapping fetches fail. */
+let lastRenderedBoardMembers = null;
 /** Map storage path → signed URL (refreshed on each board/profile load). */
 const avatarUrlByPath = new Map();
 const avatarPathsInUse = new Set();
@@ -348,9 +350,16 @@ async function removeAvatar() {
   myAvatarPath = null;
   syncProfileAvatarUi();
 
-  const { error: removeError } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .remove([oldPath]);
+  let removeError = null;
+  const { data: currentProfile } = await supabase
+    .from("profiles")
+    .select("avatar_path")
+    .eq("id", session.user.id)
+    .maybeSingle();
+  if ((currentProfile?.avatar_path || null) !== oldPath) {
+    const { error } = await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]);
+    removeError = error;
+  }
 
   const boardRefreshed = await loadBoard();
   if (!boardRefreshed) {
@@ -410,6 +419,7 @@ function renderSignedOut() {
   avatarRevision = 0;
   loadBoardGeneration = 0;
   loadBoardRenderedGeneration = 0;
+  lastRenderedBoardMembers = null;
   avatarUrlByPath.clear();
   avatarPathsInUse.clear();
   clearAvatarUrlRefresh();
@@ -558,13 +568,15 @@ function loadBoardResultIsStale(generation) {
 
 function commitLoadBoardRender(generation) {
   loadBoardRenderedGeneration = generation;
+  lastRenderedBoardMembers = boardMembers
+    ? boardMembers.map((m) => ({ ...m }))
+    : boardMembers;
   setBoardError("");
 }
 
 async function loadBoard() {
   const generation = ++loadBoardGeneration;
   const avatarRevAtStart = avatarRevision;
-  const previousBoardMembers = boardMembers;
   const previousRenderedGeneration = loadBoardRenderedGeneration;
   setBoardError("");
   els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
@@ -590,16 +602,17 @@ async function loadBoard() {
     if (loadBoardResultIsStale(generation)) return true;
     if (generation !== loadBoardGeneration) {
       if (boardMembers !== null) return true;
+      if (loadBoardGeneration > generation) return true;
       return generation <= loadBoardRenderedGeneration;
     }
     if (
       loadBoardErrorShouldKeepBoard(
         generation,
-        previousBoardMembers,
+        lastRenderedBoardMembers,
         previousRenderedGeneration
       )
     ) {
-      boardMembers = previousBoardMembers;
+      boardMembers = lastRenderedBoardMembers.map((m) => ({ ...m }));
       await patchSelfBoardAvatar();
       commitLoadBoardRender(generation);
       renderBoard();
@@ -844,12 +857,14 @@ function wireForms() {
   });
 
   els.avatarRemoveBtn.addEventListener("click", async () => {
+    els.avatarFileInput.disabled = true;
     els.avatarRemoveBtn.disabled = true;
     try {
       await removeAvatar();
     } catch (err) {
       setAvatarError(err.message || String(err));
     } finally {
+      els.avatarFileInput.disabled = false;
       els.avatarRemoveBtn.disabled = false;
     }
   });
