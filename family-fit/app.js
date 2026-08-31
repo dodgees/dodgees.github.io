@@ -1,5 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
+  AVATAR_BUCKET,
+  avatarObjectPath,
+  prepareAvatarFile,
+  validateAvatarFile,
+} from "./avatar.js";
+import {
   boardMemberAccessibleName,
   competitionSinceDay,
   localDateISO,
@@ -24,6 +30,13 @@ const els = {
   editNameBtn: document.getElementById("edit-name-btn"),
   profileEditor: document.getElementById("profile-editor"),
   profileForm: document.getElementById("profile-form"),
+  profileAvatarInitials: document.getElementById("profile-avatar-initials"),
+  profileAvatarImg: document.getElementById("profile-avatar-img"),
+  whoamiInitials: document.getElementById("whoami-initials"),
+  whoamiAvatarImg: document.getElementById("whoami-avatar-img"),
+  avatarFileInput: document.getElementById("avatar-file-input"),
+  avatarRemoveBtn: document.getElementById("avatar-remove-btn"),
+  avatarError: document.getElementById("avatar-error"),
   weightForm: document.getElementById("weight-form"),
   exerciseForm: document.getElementById("exercise-form"),
   weightPanel: document.getElementById("weight-panel"),
@@ -50,8 +63,14 @@ let activeLog = null;
 let highlightTarget = null;
 /** @type {"exercise"|"weight"} */
 let boardSort = readBoardSortPreference();
-/** @type {Array<{ id: string, name: string, weight: object, mins: number }> | null} */
+/** @type {Array<{ id: string, name: string, weight: object, mins: number, avatarPath: string|null, avatarUrl: string|null }> | null} */
 let boardMembers = null;
+/** @type {string|null} */
+let myAvatarPath = null;
+/** @type {string|null} */
+let myDisplayName = "";
+/** Map storage path → signed URL (refreshed on each board/profile load). */
+const avatarUrlByPath = new Map();
 
 function todayISO() {
   return localDateISO();
@@ -119,12 +138,128 @@ function setSubmitting(form, busy) {
 function setProfileEditorOpen(open) {
   els.profileEditor.hidden = !open;
   els.editNameBtn.setAttribute("aria-expanded", open ? "true" : "false");
-  els.editNameBtn.textContent = open ? "Cancel" : "Edit name";
+  els.editNameBtn.textContent = open ? "Cancel" : "Edit profile";
   if (open) {
+    setAvatarError("");
     const input = els.profileForm.display_name;
     input.focus();
     input.select?.();
   }
+}
+
+function initialsFromName(name) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function setAvatarError(msg) {
+  els.avatarError.hidden = !msg;
+  els.avatarError.textContent = msg || "";
+}
+
+function renderAvatarSlot(initialsEl, imgEl, { name, url }) {
+  const initials = initialsFromName(name);
+  initialsEl.textContent = initials;
+  if (url) {
+    imgEl.src = url;
+    imgEl.alt = name ? `${name}'s avatar` : "Your avatar";
+    imgEl.hidden = false;
+    initialsEl.hidden = true;
+  } else {
+    imgEl.removeAttribute("src");
+    imgEl.alt = "";
+    imgEl.hidden = true;
+    initialsEl.hidden = false;
+  }
+}
+
+function syncProfileAvatarUi() {
+  const url = myAvatarPath ? avatarUrlByPath.get(myAvatarPath) || null : null;
+  renderAvatarSlot(els.profileAvatarInitials, els.profileAvatarImg, {
+    name: myDisplayName,
+    url,
+  });
+  renderAvatarSlot(els.whoamiInitials, els.whoamiAvatarImg, {
+    name: myDisplayName,
+    url,
+  });
+  els.avatarRemoveBtn.hidden = !myAvatarPath;
+}
+
+async function resolveAvatarUrls(paths) {
+  avatarUrlByPath.clear();
+  const unique = [...new Set(paths.filter(Boolean))];
+  if (!unique.length || !supabase) return;
+
+  await Promise.all(
+    unique.map(async (path) => {
+      const { data, error } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .createSignedUrl(path, 3600);
+      if (!error && data?.signedUrl) avatarUrlByPath.set(path, data.signedUrl);
+    })
+  );
+}
+
+async function uploadAvatar(file) {
+  setAvatarError("");
+  const prepared = await prepareAvatarFile(file);
+  const path = avatarObjectPath(session.user.id, prepared.ext);
+  const { error: uploadError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, prepared.blob, {
+      upsert: true,
+      contentType: prepared.contentType,
+      cacheControl: "3600",
+    });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ avatar_path: path })
+    .eq("id", session.user.id)
+    .select("id, avatar_path");
+  const result = profileUpdateStatus(data, error);
+  if (!result.ok) throw new Error(result.message);
+
+  myAvatarPath = path;
+  await resolveAvatarUrls([path]);
+  syncProfileAvatarUi();
+  await loadBoard();
+  showStatus("Profile photo updated.", "success");
+}
+
+async function removeAvatar() {
+  setAvatarError("");
+  if (!myAvatarPath) return;
+
+  const oldPath = myAvatarPath;
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ avatar_path: null })
+    .eq("id", session.user.id)
+    .select("id");
+  const result = profileUpdateStatus(data, error);
+  if (!result.ok) throw new Error(result.message);
+
+  myAvatarPath = null;
+  syncProfileAvatarUi();
+
+  const { error: removeError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .remove([oldPath]);
+  if (removeError) {
+    showStatus("Photo removed from profile; storage cleanup may have failed.", "error");
+  } else {
+    showStatus("Profile photo removed.", "success");
+  }
+
+  await loadBoard();
 }
 
 function setLogMode(mode, { scroll = true, focus = true } = {}) {
@@ -170,6 +305,9 @@ function renderSignedOut() {
   els.auth.hidden = false;
   els.app.hidden = true;
   document.body.classList.remove("has-log-dock");
+  myAvatarPath = null;
+  myDisplayName = "";
+  avatarUrlByPath.clear();
   setProfileEditorOpen(false);
   collapseLogForms();
 }
@@ -187,15 +325,19 @@ function renderSignedIn(user) {
 async function loadProfile() {
   const { data, error } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("display_name, avatar_path")
     .eq("id", session.user.id)
     .maybeSingle();
   if (error) throw error;
   const name = data?.display_name || "";
+  myDisplayName = name;
+  myAvatarPath = data?.avatar_path || null;
   els.profileForm.display_name.value = name;
   if (name) {
     els.whoami.textContent = `${name} · ${session.user.email}`;
   }
+  await resolveAvatarUrls(myAvatarPath ? [myAvatarPath] : []);
+  syncProfileAvatarUi();
 }
 
 function deltaClass(delta) {
@@ -263,10 +405,14 @@ function renderBoard() {
       ? '<span class="member-you" aria-hidden="true">You</span>'
       : "";
     const a11yName = boardMemberAccessibleName(rank, m, isSelf);
+    const avatarHtml = m.avatarUrl
+      ? `<img class="member-avatar__img" src="${escapeHtml(m.avatarUrl)}" alt="" loading="lazy" decoding="async">`
+      : `<span class="member-avatar__initials">${escapeHtml(initialsFromName(m.name))}</span>`;
 
     return `<li class="leaderboard-item">
       <article class="member-card${selfClass}"${selfAttr} aria-label="${escapeHtml(a11yName)}">
         <div class="member-rank" aria-hidden="true">${rank}</div>
+        <div class="member-avatar" aria-hidden="true">${avatarHtml}</div>
         <div class="member-body" aria-hidden="true">
           <div class="member-top">
             <div class="member-name">${escapeHtml(m.name)}</div>
@@ -307,7 +453,7 @@ async function loadBoard() {
   const sinceDay = competitionSinceDay();
 
   const [profilesRes, weighRes, exerciseRes] = await Promise.all([
-    supabase.from("profiles").select("id, display_name").order("display_name"),
+    supabase.from("profiles").select("id, display_name, avatar_path").order("display_name"),
     supabase
       .from("weigh_ins")
       .select("user_id, weight_lbs, recorded_on, created_at")
@@ -334,6 +480,8 @@ async function loadBoard() {
     return;
   }
 
+  await resolveAvatarUrls(profiles.map((p) => p.avatar_path));
+
   const weighByUser = new Map();
   for (const row of weighRes.data || []) {
     if (!weighByUser.has(row.user_id)) weighByUser.set(row.user_id, []);
@@ -352,11 +500,14 @@ async function loadBoard() {
     const series = weighByUser.get(p.id) || [];
     const weight = weightSummaryFromSeries(series);
     const mins = minutesByUser.get(p.id) || 0;
+    const avatarPath = p.avatar_path || null;
     return {
       id: p.id,
       name: p.display_name || "Family member",
       weight,
       mins,
+      avatarPath,
+      avatarUrl: avatarPath ? avatarUrlByPath.get(avatarPath) || null : null,
     };
   });
 
@@ -507,6 +658,40 @@ function wireForms() {
     setProfileEditorOpen(els.profileEditor.hidden);
   });
 
+  els.avatarFileInput.addEventListener("change", async () => {
+    const file = els.avatarFileInput.files?.[0];
+    els.avatarFileInput.value = "";
+    if (!file) return;
+
+    const validationError = validateAvatarFile(file);
+    if (validationError) {
+      setAvatarError(validationError);
+      return;
+    }
+
+    els.avatarFileInput.disabled = true;
+    els.avatarRemoveBtn.disabled = true;
+    try {
+      await uploadAvatar(file);
+    } catch (err) {
+      setAvatarError(err.message || String(err));
+    } finally {
+      els.avatarFileInput.disabled = false;
+      els.avatarRemoveBtn.disabled = false;
+    }
+  });
+
+  els.avatarRemoveBtn.addEventListener("click", async () => {
+    els.avatarRemoveBtn.disabled = true;
+    try {
+      await removeAvatar();
+    } catch (err) {
+      setAvatarError(err.message || String(err));
+    } finally {
+      els.avatarRemoveBtn.disabled = false;
+    }
+  });
+
   const openWeight = () => setLogMode(activeLog === "weight" ? null : "weight");
   const openExercise = () => setLogMode(activeLog === "exercise" ? null : "exercise");
 
@@ -542,6 +727,8 @@ function wireForms() {
       const result = profileUpdateStatus(data, error);
       showStatus(result.message, result.ok ? "success" : "error");
       if (!result.ok) return;
+      myDisplayName = display_name;
+      syncProfileAvatarUi();
       setProfileEditorOpen(false);
       await refreshAppData();
     } finally {

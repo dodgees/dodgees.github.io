@@ -241,12 +241,110 @@ h2 {
   flex: 1;
 }
 
+.whoami-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
 .whoami {
   font-size: 0.9rem;
   color: var(--muted);
   min-width: 0;
   overflow-wrap: anywhere;
   line-height: 1.35;
+}
+
+.avatar {
+  position: relative;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--accent-soft);
+  border: 1px solid var(--panel-edge);
+  display: grid;
+  place-items: center;
+}
+
+.avatar--toolbar {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.avatar--profile {
+  width: 5rem;
+  height: 5rem;
+}
+
+.avatar__initials,
+.member-avatar__initials {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.avatar--profile .avatar__initials {
+  font-size: 1rem;
+}
+
+.avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar__img[hidden],
+.avatar__initials[hidden] {
+  display: none !important;
+}
+
+.profile-avatar-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.profile-avatar-upload {
+  cursor: pointer;
+  margin: 0;
+}
+
+.profile-avatar-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.profile-avatar-hint {
+  margin-bottom: 0;
+  font-size: 0.82rem;
+}
+
+.profile-avatar-error {
+  margin-top: 0;
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.profile-avatar-remove[hidden] {
+  display: none !important;
 }
 
 .btn-link {
@@ -629,8 +727,8 @@ body.has-log-dock .toast {
 
 .member-card {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.75rem 0.9rem;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.75rem 0.75rem;
   align-items: start;
   padding: 0.95rem 1rem;
   background: var(--panel);
@@ -684,6 +782,29 @@ body.has-log-dock .toast {
   min-width: 1.6rem;
   text-align: center;
   padding-top: 0.15rem;
+}
+
+.member-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--accent-soft);
+  border: 1px solid var(--panel-edge);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.member-avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.member-card.is-self .member-avatar {
+  border-color: var(--accent);
 }
 
 .member-body {

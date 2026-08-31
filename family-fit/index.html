@@ -52,14 +52,35 @@
     <section id="app-panel" hidden>
       <div class="toolbar">
         <div class="toolbar-identity">
-          <p id="whoami" class="whoami"></p>
-          <button type="button" id="edit-name-btn" class="btn-link" aria-expanded="false" aria-controls="profile-editor">Edit name</button>
+          <div class="whoami-row">
+            <div id="whoami-avatar" class="avatar avatar--toolbar" aria-hidden="true">
+              <span class="avatar__initials" id="whoami-initials"></span>
+              <img class="avatar__img" id="whoami-avatar-img" alt="" hidden>
+            </div>
+            <p id="whoami" class="whoami"></p>
+          </div>
+          <button type="button" id="edit-name-btn" class="btn-link" aria-expanded="false" aria-controls="profile-editor">Edit profile</button>
         </div>
         <button type="button" id="sign-out-btn" class="btn-quiet">Sign out</button>
       </div>
 
       <div id="profile-editor" class="profile-editor" hidden>
-        <form id="profile-form" class="row-form form-card">
+        <form id="profile-form" class="stack form-card">
+          <div class="profile-avatar-editor">
+            <div id="profile-avatar-preview" class="avatar avatar--profile" aria-hidden="true">
+              <span class="avatar__initials" id="profile-avatar-initials"></span>
+              <img class="avatar__img" id="profile-avatar-img" alt="" hidden>
+            </div>
+            <div class="profile-avatar-actions">
+              <label class="btn-quiet profile-avatar-upload">
+                <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp" hidden>
+                Change photo
+              </label>
+              <button type="button" id="avatar-remove-btn" class="btn-quiet profile-avatar-remove" hidden>Remove photo</button>
+              <p id="avatar-error" class="error profile-avatar-error" role="alert" hidden></p>
+              <p class="hint profile-avatar-hint">JPEG, PNG, or WebP · max 5 MB · resized to 512 px</p>
+            </div>
+          </div>
           <label>
             Display name
             <input type="text" name="display_name" required maxlength="40" autocomplete="nickname" enterkeyhint="done">
