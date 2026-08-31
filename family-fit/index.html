@@ -67,6 +67,11 @@
           <h2>Competition board</h2>
           <p class="hint">Last 30 days — latest weigh-ins and exercise minutes.</p>
         </div>
+        <div class="board-sort" role="group" aria-label="Sort competition board">
+          <button type="button" class="board-sort__btn" id="sort-exercise-btn" data-sort="exercise" aria-pressed="true">By exercise</button>
+          <button type="button" class="board-sort__btn" id="sort-weight-btn" data-sort="weight" aria-pressed="false">By weight change</button>
+        </div>
+        <p id="board-sort-status" class="board-sort-status" aria-live="polite">Sorted by exercise</p>
         <div id="board-error" class="error" role="alert" hidden></div>
         <div id="leaderboard" class="leaderboard" aria-live="polite">
           <p class="muted">Loading…</p>

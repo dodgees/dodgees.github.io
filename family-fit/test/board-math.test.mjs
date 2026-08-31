@@ -2,10 +2,15 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   competitionSinceDay,
+  formatWeightDelta,
   localDateISO,
   profileUpdateStatus,
+  readBoardSortPreference,
+  sortBoardMembers,
   weightLineFromSeries,
   weightSummaryFromSeries,
+  writeBoardSortPreference,
+  BOARD_SORT_STORAGE_KEY,
 } from "../board-math.js";
 
 describe("competitionSinceDay (local calendar)", () => {
@@ -77,8 +82,8 @@ describe("weightLineFromSeries (stable same-day order)", () => {
 });
 
 describe("weightSummaryFromSeries", () => {
-  it("exposes delta for range summaries", () => {
-    const summary = weightSummaryFromSeries([
+  it("exposes delta and glanceable primary/secondary for range summaries", () => {
+    const series = [
       {
         weight_lbs: 200,
         recorded_on: "2026-08-20",
@@ -89,21 +94,57 @@ describe("weightSummaryFromSeries", () => {
         recorded_on: "2026-08-25",
         created_at: "2026-08-25T12:00:00Z",
       },
-    ]);
+    ];
+    const summary = weightSummaryFromSeries(series);
     assert.equal(summary.kind, "range");
     assert.equal(summary.delta, -5);
-    assert.equal(summary.text, weightLineFromSeries([
-      {
-        weight_lbs: 200,
-        recorded_on: "2026-08-20",
-        created_at: "2026-08-20T10:00:00Z",
-      },
-      {
-        weight_lbs: 195,
-        recorded_on: "2026-08-25",
-        created_at: "2026-08-25T12:00:00Z",
-      },
-    ]));
+    assert.equal(summary.primary, "−5.0 lbs");
+    assert.equal(summary.secondary, "200 → 195 lbs");
+    assert.equal(summary.text, weightLineFromSeries(series));
+  });
+});
+
+describe("formatWeightDelta", () => {
+  it("formats loss with minus and gain with plus", () => {
+    assert.equal(formatWeightDelta(-5), "−5.0 lbs");
+    assert.equal(formatWeightDelta(2.5), "+2.5 lbs");
+    assert.equal(formatWeightDelta(0), "0.0 lbs");
+    assert.equal(formatWeightDelta(null), null);
+  });
+});
+
+describe("sortBoardMembers", () => {
+  const members = [
+    { name: "Ada", mins: 10, weight: { delta: -2 } },
+    { name: "Bea", mins: 40, weight: { delta: -5 } },
+    { name: "Cal", mins: 40, weight: { delta: null } },
+    { name: "Dee", mins: 5, weight: { delta: 1 } },
+  ];
+
+  it("orders by exercise minutes then name", () => {
+    const ordered = sortBoardMembers("exercise", members).map((m) => m.name);
+    assert.deepEqual(ordered, ["Bea", "Cal", "Ada", "Dee"]);
+  });
+
+  it("orders by weight loss (most negative first), nulls last", () => {
+    const ordered = sortBoardMembers("weight", members).map((m) => m.name);
+    assert.deepEqual(ordered, ["Bea", "Ada", "Dee", "Cal"]);
+  });
+});
+
+describe("board sort preference storage", () => {
+  it("defaults to exercise and round-trips weight", () => {
+    const store = new Map();
+    const fake = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+    };
+    assert.equal(readBoardSortPreference(fake), "exercise");
+    assert.equal(writeBoardSortPreference("weight", fake), "weight");
+    assert.equal(store.get(BOARD_SORT_STORAGE_KEY), "weight");
+    assert.equal(readBoardSortPreference(fake), "weight");
+    assert.equal(writeBoardSortPreference("exercise", fake), "exercise");
+    assert.equal(readBoardSortPreference(fake), "exercise");
   });
 });
 
