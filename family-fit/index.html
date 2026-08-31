@@ -45,8 +45,21 @@
 
     <section id="app-panel" hidden>
       <div class="toolbar">
-        <p id="whoami" class="whoami"></p>
+        <div class="toolbar-identity">
+          <p id="whoami" class="whoami"></p>
+          <button type="button" id="edit-name-btn" class="btn-link" aria-expanded="false" aria-controls="profile-editor">Edit name</button>
+        </div>
         <button type="button" id="sign-out-btn" class="btn-quiet">Sign out</button>
+      </div>
+
+      <div id="profile-editor" class="profile-editor" hidden>
+        <form id="profile-form" class="row-form form-card">
+          <label>
+            Display name
+            <input type="text" name="display_name" required maxlength="40" autocomplete="nickname" enterkeyhint="done">
+          </label>
+          <button type="submit" class="btn-primary">Save</button>
+        </form>
       </div>
 
       <section class="panel" id="board-section">
@@ -60,61 +73,66 @@
         </div>
       </section>
 
-      <section class="panel">
-        <h2>Your profile</h2>
-        <form id="profile-form" class="row-form form-card">
-          <label>
-            Display name
-            <input type="text" name="display_name" required maxlength="40" autocomplete="nickname" enterkeyhint="done">
-          </label>
-          <button type="submit" class="btn-primary">Save</button>
-        </form>
-      </section>
+      <section class="panel" id="log-section">
+        <div class="section-head">
+          <h2>Log today</h2>
+          <p class="hint">Tap below or use the action bar to add a weigh-in or workout.</p>
+        </div>
 
-      <section class="panel">
-        <h2>Log weight</h2>
-        <form id="weight-form" class="stack form-card">
-          <div class="row">
+        <div class="log-segment" role="tablist" aria-label="What to log">
+          <button type="button" class="log-segment__btn" id="open-weight-btn" role="tab" aria-selected="false" aria-controls="weight-panel">Log weight</button>
+          <button type="button" class="log-segment__btn" id="open-exercise-btn" role="tab" aria-selected="false" aria-controls="exercise-panel">Log exercise</button>
+        </div>
+
+        <div id="weight-panel" class="log-panel" role="tabpanel" hidden>
+          <form id="weight-form" class="stack form-card">
+            <div class="row">
+              <label>
+                Weight (lbs)
+                <input type="number" name="weight_lbs" required min="1" max="999" step="0.1" inputmode="decimal" enterkeyhint="next">
+              </label>
+              <label>
+                Date
+                <input type="date" name="recorded_on" required>
+              </label>
+            </div>
             <label>
-              Weight (lbs)
-              <input type="number" name="weight_lbs" required min="1" max="999" step="0.1" inputmode="decimal" enterkeyhint="next">
+              Note <span class="optional">(optional)</span>
+              <input type="text" name="note" maxlength="120" enterkeyhint="done">
             </label>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary btn-block">Add weigh-in</button>
+              <button type="button" class="btn-quiet cancel-log-btn" data-close="weight">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="exercise-panel" class="log-panel" role="tabpanel" hidden>
+          <form id="exercise-form" class="stack form-card">
+            <div class="row">
+              <label>
+                Activity
+                <input type="text" name="activity" required maxlength="80" placeholder="Walk, bike, gym…" enterkeyhint="next">
+              </label>
+              <label class="label-narrow">
+                Minutes
+                <input type="number" name="duration_minutes" required min="1" max="1440" step="1" inputmode="numeric" enterkeyhint="next">
+              </label>
+            </div>
             <label>
               Date
               <input type="date" name="recorded_on" required>
             </label>
-          </div>
-          <label>
-            Note <span class="optional">(optional)</span>
-            <input type="text" name="note" maxlength="120" enterkeyhint="done">
-          </label>
-          <button type="submit" class="btn-primary btn-block">Add weigh-in</button>
-        </form>
-      </section>
-
-      <section class="panel">
-        <h2>Log exercise</h2>
-        <form id="exercise-form" class="stack form-card">
-          <div class="row">
             <label>
-              Activity
-              <input type="text" name="activity" required maxlength="80" placeholder="Walk, bike, gym…" enterkeyhint="next">
+              Note <span class="optional">(optional)</span>
+              <input type="text" name="note" maxlength="120" enterkeyhint="done">
             </label>
-            <label class="label-narrow">
-              Minutes
-              <input type="number" name="duration_minutes" required min="1" max="1440" step="1" inputmode="numeric" enterkeyhint="next">
-            </label>
-          </div>
-          <label>
-            Date
-            <input type="date" name="recorded_on" required>
-          </label>
-          <label>
-            Note <span class="optional">(optional)</span>
-            <input type="text" name="note" maxlength="120" enterkeyhint="done">
-          </label>
-          <button type="submit" class="btn-primary btn-block">Add exercise</button>
-        </form>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary btn-block">Add exercise</button>
+              <button type="button" class="btn-quiet cancel-log-btn" data-close="exercise">Cancel</button>
+            </div>
+          </form>
+        </div>
       </section>
 
       <section class="panel">
@@ -123,6 +141,11 @@
           <p class="muted">Loading…</p>
         </div>
       </section>
+
+      <nav id="log-dock" class="log-dock" aria-label="Quick log actions">
+        <button type="button" class="log-dock__btn" id="dock-weight-btn">Log weight</button>
+        <button type="button" class="log-dock__btn" id="dock-exercise-btn">Log exercise</button>
+      </nav>
     </section>
 
     <div id="form-status" class="toast" role="status" aria-live="polite" hidden></div>

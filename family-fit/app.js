@@ -17,9 +17,18 @@ const els = {
   authError: document.getElementById("auth-error"),
   signOut: document.getElementById("sign-out-btn"),
   whoami: document.getElementById("whoami"),
+  editNameBtn: document.getElementById("edit-name-btn"),
+  profileEditor: document.getElementById("profile-editor"),
   profileForm: document.getElementById("profile-form"),
   weightForm: document.getElementById("weight-form"),
   exerciseForm: document.getElementById("exercise-form"),
+  weightPanel: document.getElementById("weight-panel"),
+  exercisePanel: document.getElementById("exercise-panel"),
+  openWeightBtn: document.getElementById("open-weight-btn"),
+  openExerciseBtn: document.getElementById("open-exercise-btn"),
+  dockWeightBtn: document.getElementById("dock-weight-btn"),
+  dockExerciseBtn: document.getElementById("dock-exercise-btn"),
+  logSection: document.getElementById("log-section"),
   leaderboard: document.getElementById("leaderboard"),
   boardError: document.getElementById("board-error"),
   myEntries: document.getElementById("my-entries"),
@@ -28,6 +37,10 @@ const els = {
 
 let supabase = null;
 let session = null;
+/** @type {"weight"|"exercise"|null} */
+let activeLog = null;
+/** @type {{ kind: "weight"|"exercise", id: string } | null} */
+let highlightTarget = null;
 
 function todayISO() {
   return localDateISO();
@@ -70,7 +83,7 @@ function seedDates() {
   const today = todayISO();
   for (const form of [els.weightForm, els.exerciseForm]) {
     const input = form.querySelector('[name="recorded_on"]');
-    if (input && !input.value) input.value = today;
+    if (input) input.value = today;
   }
 }
 
@@ -87,15 +100,71 @@ function setSubmitting(form, busy) {
   }
 }
 
+function setProfileEditorOpen(open) {
+  els.profileEditor.hidden = !open;
+  els.editNameBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  els.editNameBtn.textContent = open ? "Cancel" : "Edit name";
+  if (open) {
+    const input = els.profileForm.display_name;
+    input.focus();
+    input.select?.();
+  }
+}
+
+function setLogMode(mode, { scroll = true, focus = true } = {}) {
+  const next = mode === "weight" || mode === "exercise" ? mode : null;
+  const entering = Boolean(next && next !== activeLog);
+  activeLog = next;
+
+  const weightOpen = activeLog === "weight";
+  const exerciseOpen = activeLog === "exercise";
+
+  els.weightPanel.hidden = !weightOpen;
+  els.exercisePanel.hidden = !exerciseOpen;
+
+  els.openWeightBtn.classList.toggle("is-active", weightOpen);
+  els.openExerciseBtn.classList.toggle("is-active", exerciseOpen);
+  els.openWeightBtn.setAttribute("aria-selected", weightOpen ? "true" : "false");
+  els.openExerciseBtn.setAttribute("aria-selected", exerciseOpen ? "true" : "false");
+
+  if (!activeLog) return;
+
+  if (entering) {
+    seedDates();
+  }
+
+  if (scroll) {
+    els.logSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  if (focus) {
+    const form = activeLog === "weight" ? els.weightForm : els.exerciseForm;
+    const first = form.querySelector(
+      activeLog === "weight" ? '[name="weight_lbs"]' : '[name="activity"]'
+    );
+    requestAnimationFrame(() => first?.focus());
+  }
+}
+
+function collapseLogForms() {
+  setLogMode(null);
+}
+
 function renderSignedOut() {
   els.auth.hidden = false;
   els.app.hidden = true;
+  document.body.classList.remove("has-log-dock");
+  setProfileEditorOpen(false);
+  collapseLogForms();
 }
 
 function renderSignedIn(user) {
   els.auth.hidden = true;
   els.app.hidden = false;
+  document.body.classList.add("has-log-dock");
   els.whoami.textContent = user.email || "Signed in";
+  setProfileEditorOpen(false);
+  collapseLogForms();
   seedDates();
 }
 
@@ -213,19 +282,22 @@ async function loadBoard() {
 }
 
 async function loadMyEntries() {
+  const mark = highlightTarget;
+  highlightTarget = null;
+
   els.myEntries.innerHTML = '<p class="muted">Loading…</p>';
   const uid = session.user.id;
 
   const [w, e] = await Promise.all([
     supabase
       .from("weigh_ins")
-      .select("weight_lbs, recorded_on, note, created_at")
+      .select("id, weight_lbs, recorded_on, note, created_at")
       .eq("user_id", uid)
       .order("recorded_on", { ascending: false })
       .limit(8),
     supabase
       .from("exercise_logs")
-      .select("activity, duration_minutes, recorded_on, note, created_at")
+      .select("id, activity, duration_minutes, recorded_on, note, created_at")
       .eq("user_id", uid)
       .order("recorded_on", { ascending: false })
       .limit(8),
@@ -239,24 +311,44 @@ async function loadMyEntries() {
   const rows = [];
   for (const row of w.data || []) {
     rows.push({
+      kind: "weight",
+      id: row.id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      html: `<div class="entry-row"><span>Weight ${escapeHtml(String(row.weight_lbs))} lbs${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
+      html: `<div class="entry-row" data-kind="weight"><span>Weight ${escapeHtml(String(row.weight_lbs))} lbs${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
     });
   }
   for (const row of e.data || []) {
     rows.push({
+      kind: "exercise",
+      id: row.id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      html: `<div class="entry-row"><span>${escapeHtml(row.activity)} · ${escapeHtml(String(row.duration_minutes))} min${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
+      html: `<div class="entry-row" data-kind="exercise"><span>${escapeHtml(row.activity)} · ${escapeHtml(String(row.duration_minutes))} min${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
     });
   }
   rows.sort((a, b) => (a.sort < b.sort ? 1 : -1));
 
-  els.myEntries.innerHTML = rows.length
-    ? rows
-        .slice(0, 12)
-        .map((r) => r.html)
-        .join("")
-    : '<p class="muted">No entries yet — log a weigh-in or workout above.</p>';
+  if (!rows.length) {
+    els.myEntries.innerHTML =
+      '<p class="muted">No entries yet — use Log weight or Log exercise to add one.</p>';
+    return;
+  }
+
+  let marked = false;
+  els.myEntries.innerHTML = rows
+    .slice(0, 12)
+    .map((r) => {
+      if (mark && !marked && r.kind === mark.kind && r.id === mark.id) {
+        marked = true;
+        return r.html.replace('class="entry-row"', 'class="entry-row is-fresh"');
+      }
+      return r.html;
+    })
+    .join("");
+
+  if (marked) {
+    const fresh = els.myEntries.querySelector(".entry-row.is-fresh");
+    fresh?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 }
 
 function escapeHtml(str) {
@@ -310,6 +402,22 @@ function wireForms() {
     }
   });
 
+  els.editNameBtn.addEventListener("click", () => {
+    setProfileEditorOpen(els.profileEditor.hidden);
+  });
+
+  const openWeight = () => setLogMode(activeLog === "weight" ? null : "weight");
+  const openExercise = () => setLogMode(activeLog === "exercise" ? null : "exercise");
+
+  els.openWeightBtn.addEventListener("click", openWeight);
+  els.openExerciseBtn.addEventListener("click", openExercise);
+  els.dockWeightBtn.addEventListener("click", () => setLogMode("weight"));
+  els.dockExerciseBtn.addEventListener("click", () => setLogMode("exercise"));
+
+  document.querySelectorAll(".cancel-log-btn").forEach((btn) => {
+    btn.addEventListener("click", () => collapseLogForms());
+  });
+
   els.profileForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     setSubmitting(els.profileForm, true);
@@ -323,6 +431,7 @@ function wireForms() {
       const result = profileUpdateStatus(data, error);
       showStatus(result.message, result.ok ? "success" : "error");
       if (!result.ok) return;
+      setProfileEditorOpen(false);
       await refreshAppData();
     } finally {
       setSubmitting(els.profileForm, false);
@@ -340,13 +449,19 @@ function wireForms() {
         recorded_on: String(fd.get("recorded_on")),
         note: String(fd.get("note") || "").trim() || null,
       };
-      const { error } = await supabase.from("weigh_ins").insert(payload);
+      const { data, error } = await supabase
+        .from("weigh_ins")
+        .insert(payload)
+        .select("id")
+        .single();
       if (error) {
         showStatus(error.message, "error");
         return;
       }
       els.weightForm.reset();
       seedDates();
+      if (data?.id) highlightTarget = { kind: "weight", id: data.id };
+      collapseLogForms();
       showStatus("Weigh-in logged.", "success");
       await refreshAppData();
     } finally {
@@ -366,13 +481,19 @@ function wireForms() {
         recorded_on: String(fd.get("recorded_on")),
         note: String(fd.get("note") || "").trim() || null,
       };
-      const { error } = await supabase.from("exercise_logs").insert(payload);
+      const { data, error } = await supabase
+        .from("exercise_logs")
+        .insert(payload)
+        .select("id")
+        .single();
       if (error) {
         showStatus(error.message, "error");
         return;
       }
       els.exerciseForm.reset();
       seedDates();
+      if (data?.id) highlightTarget = { kind: "exercise", id: data.id };
+      collapseLogForms();
       showStatus("Exercise logged.", "success");
       await refreshAppData();
     } finally {
@@ -386,6 +507,7 @@ async function main() {
     els.setup.hidden = false;
     els.auth.hidden = true;
     els.app.hidden = true;
+    document.body.classList.remove("has-log-dock");
     return;
   }
 
