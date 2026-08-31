@@ -18,10 +18,10 @@ Invite-only family weight-loss / healthy-living competition mini-app, served as 
 
 1. In the Supabase dashboard: **SQL → New query**.
 2. Paste the contents of [`schema.sql`](./schema.sql) and run it.
-3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**.
+3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**, and that `profiles` has an `avatar_path` column.
 4. Confirm **Storage** has a private bucket named **`avatars`** (the SQL creates it; if the insert fails, create it manually — see below).
 
-Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name or log weigh-ins.
+Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, or log weigh-ins.
 
 #### Avatar storage (if the bucket is missing)
 

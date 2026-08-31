@@ -12,7 +12,7 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
-comment on table public.profiles is 'Family member display names for the competition.';
+comment on table public.profiles is 'Family member display names and optional avatar paths for the competition.';
 comment on column public.profiles.avatar_path is 'Object path in the avatars storage bucket, e.g. {user_id}/avatar.webp';
 
 -- Additive migration for projects that ran an older schema.sql
