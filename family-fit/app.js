@@ -3,7 +3,10 @@ import {
   competitionSinceDay,
   localDateISO,
   profileUpdateStatus,
+  readBoardSortPreference,
+  sortBoardMembers,
   weightSummaryFromSeries,
+  writeBoardSortPreference,
 } from "./board-math.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
@@ -31,6 +34,9 @@ const els = {
   logSection: document.getElementById("log-section"),
   leaderboard: document.getElementById("leaderboard"),
   boardError: document.getElementById("board-error"),
+  boardSortStatus: document.getElementById("board-sort-status"),
+  sortExerciseBtn: document.getElementById("sort-exercise-btn"),
+  sortWeightBtn: document.getElementById("sort-weight-btn"),
   myEntries: document.getElementById("my-entries"),
   status: document.getElementById("form-status"),
 };
@@ -41,6 +47,10 @@ let session = null;
 let activeLog = null;
 /** @type {{ kind: "weight"|"exercise", id: string } | null} */
 let highlightTarget = null;
+/** @type {"exercise"|"weight"} */
+let boardSort = readBoardSortPreference();
+/** @type {Array<{ id: string, name: string, weight: object, mins: number }> | null} */
+let boardMembers = null;
 
 function todayISO() {
   return localDateISO();
@@ -184,12 +194,79 @@ async function loadProfile() {
 
 function deltaClass(delta) {
   if (delta == null || Number.isNaN(delta) || delta === 0) return "";
-  return delta < 0 ? " stat-value--delta-down" : " stat-value--delta-up";
+  return delta < 0 ? " member-delta--down" : " member-delta--up";
+}
+
+function sortLabel(mode) {
+  return mode === "weight" ? "weight change" : "exercise";
+}
+
+function syncSortControls() {
+  const byExercise = boardSort === "exercise";
+  els.sortExerciseBtn.classList.toggle("is-active", byExercise);
+  els.sortWeightBtn.classList.toggle("is-active", !byExercise);
+  els.sortExerciseBtn.setAttribute("aria-pressed", byExercise ? "true" : "false");
+  els.sortWeightBtn.setAttribute("aria-pressed", byExercise ? "false" : "true");
+  els.boardSortStatus.textContent = `Sorted by ${sortLabel(boardSort)}`;
+}
+
+function setBoardSort(mode) {
+  boardSort = writeBoardSortPreference(mode);
+  syncSortControls();
+  if (boardMembers) renderBoard();
+}
+
+function renderBoard() {
+  if (!boardMembers) return;
+
+  if (!boardMembers.length) {
+    els.leaderboard.innerHTML =
+      '<p class="muted">No family members yet. Invite users in Supabase Auth.</p>';
+    return;
+  }
+
+  const selfId = session?.user?.id || null;
+  const ordered = sortBoardMembers(boardSort, boardMembers);
+  const maxMins = Math.max(0, ...ordered.map((m) => m.mins));
+
+  const cards = ordered.map((m, i) => {
+    const isSelf = selfId && m.id === selfId;
+    const weightClass = deltaClass(m.weight.delta);
+    const exerciseLabel = m.mins > 0 ? `${m.mins} min` : "0 min";
+    const barPct =
+      maxMins > 0 && m.mins > 0
+        ? Math.max(8, Math.round((m.mins / maxMins) * 100))
+        : 0;
+    const selfAttr = isSelf ? ' data-self="true"' : "";
+    const selfClass = isSelf ? " is-self" : "";
+    const youBadge = isSelf
+      ? '<span class="member-you">You</span>'
+      : "";
+
+    return `<article class="member-card${selfClass}"${selfAttr}>
+      <div class="member-rank" aria-hidden="true">${i + 1}</div>
+      <div class="member-body">
+        <div class="member-top">
+          <div class="member-name">${escapeHtml(m.name)}</div>
+          ${youBadge}
+        </div>
+        <div class="member-delta${weightClass}">${escapeHtml(m.weight.primary)}</div>
+        <div class="member-range">${escapeHtml(m.weight.secondary)}</div>
+        <div class="member-exercise" title="${m.mins} minutes in the last 30 days">
+          <span class="exercise-chip">${escapeHtml(exerciseLabel)}</span>
+          <span class="exercise-bar" aria-hidden="true"><span class="exercise-bar__fill" style="width:${barPct}%"></span></span>
+        </div>
+      </div>
+    </article>`;
+  });
+
+  els.leaderboard.innerHTML = cards.join("");
 }
 
 async function loadBoard() {
   setBoardError("");
   els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
+  boardMembers = null;
 
   const sinceDay = competitionSinceDay();
 
@@ -216,8 +293,8 @@ async function loadBoard() {
 
   const profiles = profilesRes.data || [];
   if (!profiles.length) {
-    els.leaderboard.innerHTML =
-      '<p class="muted">No family members yet. Invite users in Supabase Auth.</p>';
+    boardMembers = [];
+    renderBoard();
     return;
   }
 
@@ -235,7 +312,7 @@ async function loadBoard() {
     );
   }
 
-  const members = profiles.map((p) => {
+  boardMembers = profiles.map((p) => {
     const series = weighByUser.get(p.id) || [];
     const weight = weightSummaryFromSeries(series);
     const mins = minutesByUser.get(p.id) || 0;
@@ -247,38 +324,8 @@ async function loadBoard() {
     };
   });
 
-  // Motivating scan order: most exercise minutes first, then name.
-  members.sort((a, b) => {
-    if (b.mins !== a.mins) return b.mins - a.mins;
-    return a.name.localeCompare(b.name);
-  });
-
-  const cards = members.map((m, i) => {
-    const exerciseText =
-      m.mins > 0
-        ? `${m.mins} minutes in the last 30 days`
-        : "No exercise logged in the last 30 days";
-    const weightClass = deltaClass(m.weight.delta);
-
-    return `<article class="member-card">
-      <div class="member-rank" aria-hidden="true">${i + 1}</div>
-      <div class="member-body">
-        <div class="member-name">${escapeHtml(m.name)}</div>
-        <div class="member-stats">
-          <div class="stat-line">
-            <span class="stat-label">Weight</span>
-            <span class="stat-value${weightClass}">${escapeHtml(m.weight.text)}</span>
-          </div>
-          <div class="stat-line">
-            <span class="stat-label">Exercise</span>
-            <span class="stat-value">${escapeHtml(exerciseText)}</span>
-          </div>
-        </div>
-      </div>
-    </article>`;
-  });
-
-  els.leaderboard.innerHTML = cards.join("");
+  syncSortControls();
+  renderBoard();
 }
 
 async function loadMyEntries() {
@@ -418,6 +465,9 @@ function wireForms() {
     btn.addEventListener("click", () => collapseLogForms());
   });
 
+  els.sortExerciseBtn.addEventListener("click", () => setBoardSort("exercise"));
+  els.sortWeightBtn.addEventListener("click", () => setBoardSort("weight"));
+
   els.profileForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     setSubmitting(els.profileForm, true);
@@ -520,6 +570,7 @@ async function main() {
   });
 
   wireForms();
+  syncSortControls();
 
   const { data } = await supabase.auth.getSession();
   await onSession(data.session);

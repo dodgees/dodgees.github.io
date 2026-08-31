@@ -28,9 +28,19 @@ function sortWeighSeries(series) {
   });
 }
 
+/** Display label for a weight delta in lbs (e.g. "−5.0 lbs"). */
+export function formatWeightDelta(delta) {
+  if (delta == null || Number.isNaN(delta)) return null;
+  const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
+  const mag = Math.abs(delta).toFixed(1);
+  return `${sign}${mag} lbs`;
+}
+
 /**
  * Structured weigh-in summary for the competition board.
  * Stable order: recorded_on asc, then created_at asc.
+ * Board cards use primary (glance delta/latest) and secondary (start→latest);
+ * text remains the legacy full sentence.
  */
 export function weightSummaryFromSeries(series) {
   const sorted = sortWeighSeries(series);
@@ -39,29 +49,98 @@ export function weightSummaryFromSeries(series) {
       kind: "empty",
       text: "No weigh-ins in the last 30 days",
       delta: null,
+      startLbs: null,
+      latestLbs: null,
+      primary: "—",
+      secondary: "No weigh-ins in the last 30 days",
     };
   }
   if (sorted.length === 1) {
+    const only = sorted[0];
+    const lbs = Number(only.weight_lbs);
     return {
       kind: "single",
-      text: `Latest: ${sorted[0].weight_lbs} lbs (${sorted[0].recorded_on})`,
+      text: `Latest: ${only.weight_lbs} lbs (${only.recorded_on})`,
       delta: null,
+      startLbs: lbs,
+      latestLbs: lbs,
+      primary: `${only.weight_lbs} lbs`,
+      secondary: `Latest · ${only.recorded_on}`,
     };
   }
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
-  const delta = Number(last.weight_lbs) - Number(first.weight_lbs);
+  const startLbs = Number(first.weight_lbs);
+  const latestLbs = Number(last.weight_lbs);
+  const delta = latestLbs - startLbs;
   const sign = delta > 0 ? "+" : "";
+  const deltaLabel = formatWeightDelta(delta);
   return {
     kind: "range",
     text: `${first.weight_lbs} → ${last.weight_lbs} lbs (${sign}${delta.toFixed(1)} over 30 days)`,
     delta,
+    startLbs,
+    latestLbs,
+    primary: deltaLabel,
+    secondary: `${first.weight_lbs} → ${last.weight_lbs} lbs`,
   };
 }
 
 /**
- * Stable weigh-in series: recorded_on asc, then created_at asc.
- * Returns the weight line shown on the competition board.
+ * Sort competition-board members for display order.
+ * exercise: most minutes first, then name.
+ * weight: most weight loss (most negative delta) first; null/NaN deltas last; then name.
+ * @param {"exercise"|"weight"} mode
+ * @param {Array<{ name: string, mins: number, weight: { delta: number|null } }>} members
+ */
+export function sortBoardMembers(mode, members) {
+  const list = [...members];
+  if (mode === "weight") {
+    list.sort((a, b) => {
+      const da = a.weight?.delta;
+      const db = b.weight?.delta;
+      const aHas = da != null && !Number.isNaN(da);
+      const bHas = db != null && !Number.isNaN(db);
+      if (aHas && bHas && da !== db) return da - db; // more loss (more negative) first
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    return list;
+  }
+  // Default: most exercise minutes first
+  list.sort((a, b) => {
+    if (b.mins !== a.mins) return b.mins - a.mins;
+    return a.name.localeCompare(b.name);
+  });
+  return list;
+}
+
+export const BOARD_SORT_STORAGE_KEY = "family-fit.boardSort";
+
+/** @returns {"exercise"|"weight"} */
+export function readBoardSortPreference(storage = globalThis.localStorage) {
+  try {
+    const raw = storage?.getItem?.(BOARD_SORT_STORAGE_KEY);
+    return raw === "weight" ? "weight" : "exercise";
+  } catch {
+    return "exercise";
+  }
+}
+
+/** @param {"exercise"|"weight"} mode */
+export function writeBoardSortPreference(mode, storage = globalThis.localStorage) {
+  const next = mode === "weight" ? "weight" : "exercise";
+  try {
+    storage?.setItem?.(BOARD_SORT_STORAGE_KEY, next);
+  } catch {
+    /* ignore quota / private mode */
+  }
+  return next;
+}
+
+/**
+ * Legacy full-sentence weight summary (`weightSummaryFromSeries(...).text`).
+ * Board cards render primary/secondary instead.
  */
 export function weightLineFromSeries(series) {
   return weightSummaryFromSeries(series).text;
