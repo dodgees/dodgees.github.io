@@ -589,6 +589,7 @@ async function loadBoard() {
   if (profilesRes.error || weighRes.error || exerciseRes.error) {
     if (loadBoardResultIsStale(generation)) return true;
     if (generation !== loadBoardGeneration) {
+      if (boardMembers !== null) return true;
       return generation <= loadBoardRenderedGeneration;
     }
     if (
@@ -600,9 +601,11 @@ async function loadBoard() {
     ) {
       boardMembers = previousBoardMembers;
       await patchSelfBoardAvatar();
+      commitLoadBoardRender(generation);
       renderBoard();
       return true;
     }
+    if (boardMembers !== null) return true;
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(err.message);
     els.leaderboard.innerHTML = "";
