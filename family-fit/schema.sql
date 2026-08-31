@@ -113,7 +113,10 @@ create policy "profiles_update_own"
   on public.profiles for update
   to authenticated
   using (auth.uid() = id)
-  with check (auth.uid() = id);
+  with check (
+    auth.uid() = id
+    and (avatar_path is null or avatar_path like auth.uid()::text || '/%')
+  );
 
 -- No insert/delete for clients; profile rows come from the auth trigger or the backfill above.
 

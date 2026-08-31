@@ -71,6 +71,36 @@ let myAvatarPath = null;
 let myDisplayName = "";
 /** Map storage path → signed URL (refreshed on each board/profile load). */
 const avatarUrlByPath = new Map();
+const avatarPathsInUse = new Set();
+const AVATAR_SIGNED_URL_TTL_SEC = 3600;
+const AVATAR_SIGNED_URL_REFRESH_MS = (AVATAR_SIGNED_URL_TTL_SEC - 600) * 1000;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let avatarUrlRefreshTimer = null;
+
+function clearAvatarUrlRefresh() {
+  clearTimeout(avatarUrlRefreshTimer);
+  avatarUrlRefreshTimer = null;
+}
+
+function scheduleAvatarUrlRefresh() {
+  clearAvatarUrlRefresh();
+  if (!avatarPathsInUse.size || !session || !supabase) return;
+  avatarUrlRefreshTimer = setTimeout(refreshAvatarUrlsInUse, AVATAR_SIGNED_URL_REFRESH_MS);
+}
+
+async function refreshAvatarUrlsInUse() {
+  if (!session || !supabase || !avatarPathsInUse.size) return;
+  await resolveAvatarUrls([...avatarPathsInUse], { retainPaths: true });
+  syncProfileAvatarUi();
+  if (boardMembers) {
+    boardMembers = boardMembers.map((m) => ({
+      ...m,
+      avatarUrl: m.avatarPath ? avatarUrlByPath.get(m.avatarPath) || null : null,
+    }));
+    renderBoard();
+  }
+  scheduleAvatarUrlRefresh();
+}
 
 function todayISO() {
   return localDateISO();
@@ -162,20 +192,43 @@ function setAvatarError(msg) {
   els.avatarError.textContent = msg || "";
 }
 
+function showAvatarInitials(imgEl, initialsEl) {
+  imgEl.onerror = null;
+  imgEl.removeAttribute("src");
+  imgEl.alt = "";
+  imgEl.hidden = true;
+  initialsEl.hidden = false;
+}
+
 function renderAvatarSlot(initialsEl, imgEl, { name, url }) {
   const initials = initialsFromName(name);
   initialsEl.textContent = initials;
+  imgEl.onerror = null;
   if (url) {
+    imgEl.onerror = () => showAvatarInitials(imgEl, initialsEl);
     imgEl.src = url;
     imgEl.alt = name ? `${name}'s avatar` : "Your avatar";
     imgEl.hidden = false;
     initialsEl.hidden = true;
   } else {
-    imgEl.removeAttribute("src");
-    imgEl.alt = "";
-    imgEl.hidden = true;
-    initialsEl.hidden = false;
+    showAvatarInitials(imgEl, initialsEl);
   }
+}
+
+function handleBoardAvatarError(ev) {
+  const img = ev.target;
+  if (!(img instanceof HTMLImageElement) || !img.classList.contains("member-avatar__img")) {
+    return;
+  }
+  const avatar = img.closest(".member-avatar");
+  if (!avatar || avatar.querySelector(".member-avatar__initials")) return;
+  const name =
+    img.closest(".member-card")?.querySelector(".member-name")?.textContent || "";
+  img.remove();
+  const span = document.createElement("span");
+  span.className = "member-avatar__initials";
+  span.textContent = initialsFromName(name);
+  avatar.appendChild(span);
 }
 
 function syncProfileAvatarUi() {
@@ -191,19 +244,27 @@ function syncProfileAvatarUi() {
   els.avatarRemoveBtn.hidden = !myAvatarPath;
 }
 
-async function resolveAvatarUrls(paths) {
-  avatarUrlByPath.clear();
+async function resolveAvatarUrls(paths, { retainPaths = false } = {}) {
+  if (!retainPaths) {
+    avatarUrlByPath.clear();
+    avatarPathsInUse.clear();
+  }
   const unique = [...new Set(paths.filter(Boolean))];
-  if (!unique.length || !supabase) return;
+  for (const path of unique) avatarPathsInUse.add(path);
+  if (!unique.length || !supabase) {
+    scheduleAvatarUrlRefresh();
+    return;
+  }
 
   await Promise.all(
     unique.map(async (path) => {
       const { data, error } = await supabase.storage
         .from(AVATAR_BUCKET)
-        .createSignedUrl(path, 3600);
+        .createSignedUrl(path, AVATAR_SIGNED_URL_TTL_SEC);
       if (!error && data?.signedUrl) avatarUrlByPath.set(path, data.signedUrl);
     })
   );
+  scheduleAvatarUrlRefresh();
 }
 
 async function uploadAvatar(file) {
@@ -308,6 +369,8 @@ function renderSignedOut() {
   myAvatarPath = null;
   myDisplayName = "";
   avatarUrlByPath.clear();
+  avatarPathsInUse.clear();
+  clearAvatarUrlRefresh();
   setProfileEditorOpen(false);
   collapseLogForms();
 }
@@ -706,6 +769,7 @@ function wireForms() {
 
   els.sortExerciseBtn.addEventListener("click", () => setBoardSort("exercise"));
   els.sortWeightBtn.addEventListener("click", () => setBoardSort("weight"));
+  els.leaderboard.addEventListener("error", handleBoardAvatarError, true);
 
   els.app.addEventListener("click", (ev) => {
     const btn = ev.target.closest("[data-open-log]");
