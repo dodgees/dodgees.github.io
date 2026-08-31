@@ -193,3 +193,14 @@ export function profileUpdateStatus(data, error) {
   }
   return { ok: true, message: "Display name saved." };
 }
+
+/** Whether a failed loadBoard should restore the last rendered snapshot. */
+export function loadBoardErrorShouldKeepBoard(
+  generation,
+  previousBoardMembers,
+  previousRenderedGeneration
+) {
+  return (
+    previousBoardMembers !== null && generation > previousRenderedGeneration
+  );
+}

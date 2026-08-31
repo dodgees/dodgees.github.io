@@ -9,6 +9,7 @@ import {
   boardMemberAccessibleName,
   competitionSinceDay,
   localDateISO,
+  loadBoardErrorShouldKeepBoard,
   profileUpdateStatus,
   readBoardSortPreference,
   sortBoardMembers,
@@ -321,8 +322,13 @@ async function uploadAvatar(file) {
   myAvatarPath = path;
   await resolveAvatarUrls([path], { retainPaths: true });
   syncProfileAvatarUi();
-  await loadBoard();
-  showStatus("Profile photo updated.", "success");
+  const boardRefreshed = await loadBoard();
+  showStatus(
+    boardRefreshed
+      ? "Profile photo updated."
+      : "Profile photo saved, but the board could not be refreshed.",
+    boardRefreshed ? "success" : "error"
+  );
 }
 
 async function removeAvatar() {
@@ -548,10 +554,6 @@ function loadBoardResultIsStale(generation) {
   return generation < loadBoardRenderedGeneration;
 }
 
-function loadBoardErrorShouldKeepBoard(generation) {
-  return boardMembers !== null && generation > loadBoardRenderedGeneration;
-}
-
 function commitLoadBoardRender(generation) {
   loadBoardRenderedGeneration = generation;
   setBoardError("");
@@ -560,6 +562,8 @@ function commitLoadBoardRender(generation) {
 async function loadBoard() {
   const generation = ++loadBoardGeneration;
   const avatarRevAtStart = avatarRevision;
+  const previousBoardMembers = boardMembers;
+  const previousRenderedGeneration = loadBoardRenderedGeneration;
   setBoardError("");
   els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
   boardMembers = null;
@@ -581,31 +585,43 @@ async function loadBoard() {
   ]);
 
   if (profilesRes.error || weighRes.error || exerciseRes.error) {
-    if (loadBoardResultIsStale(generation)) return;
-    if (generation !== loadBoardGeneration) return;
-    if (loadBoardErrorShouldKeepBoard(generation)) return;
+    if (loadBoardResultIsStale(generation)) return true;
+    if (generation !== loadBoardGeneration) {
+      return generation <= loadBoardRenderedGeneration;
+    }
+    if (
+      loadBoardErrorShouldKeepBoard(
+        generation,
+        previousBoardMembers,
+        previousRenderedGeneration
+      )
+    ) {
+      boardMembers = previousBoardMembers;
+      renderBoard();
+      return false;
+    }
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(err.message);
     els.leaderboard.innerHTML = "";
-    return;
+    return false;
   }
 
   const profiles = profilesRes.data || [];
   if (!profiles.length) {
-    if (loadBoardResultIsStale(generation)) return;
+    if (loadBoardResultIsStale(generation)) return true;
     boardMembers = [];
     commitLoadBoardRender(generation);
     renderBoard();
-    return;
+    return true;
   }
 
-  if (loadBoardResultIsStale(generation)) return;
+  if (loadBoardResultIsStale(generation)) return true;
   const avatarPaths = profiles.map((p) => p.avatar_path);
   if (myAvatarPath && !avatarPaths.includes(myAvatarPath)) {
     avatarPaths.push(myAvatarPath);
   }
   await resolveAvatarUrls(avatarPaths);
-  if (loadBoardResultIsStale(generation)) return;
+  if (loadBoardResultIsStale(generation)) return true;
 
   const weighByUser = new Map();
   for (const row of weighRes.data || []) {
@@ -638,12 +654,13 @@ async function loadBoard() {
 
   if (avatarRevAtStart !== avatarRevision) {
     await patchSelfBoardAvatar();
-    if (loadBoardResultIsStale(generation)) return;
+    if (loadBoardResultIsStale(generation)) return true;
   }
 
   commitLoadBoardRender(generation);
   syncSortControls();
   renderBoard();
+  return true;
 }
 
 async function loadMyEntries() {
