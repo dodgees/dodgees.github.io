@@ -60,13 +60,15 @@ export function weightPhraseForA11y(weight) {
  * Coherent ranked accessible name, e.g. "1. Alex, down 5 pounds, 30 minutes exercise".
  * @param {number} rank 1-based
  * @param {{ name: string, mins: number, weight: object }} member
+ * @param {boolean} [isSelf] when true, append a self marker for the signed-in user
  */
-export function boardMemberAccessibleName(rank, member) {
+export function boardMemberAccessibleName(rank, member, isSelf = false) {
   const name = member?.name || "Family member";
   const weightPart = weightPhraseForA11y(member?.weight);
   const mins = Number(member?.mins) || 0;
   const exercisePart = `${mins} ${mins === 1 ? "minute" : "minutes"} exercise`;
-  return `${rank}. ${name}, ${weightPart}, ${exercisePart}`;
+  const selfPart = isSelf ? ", you" : "";
+  return `${rank}. ${name}, ${weightPart}, ${exercisePart}${selfPart}`;
 }
 
 /**

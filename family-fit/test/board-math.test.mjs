@@ -125,6 +125,19 @@ describe("boardMemberAccessibleName", () => {
     assert.equal(name, "1. Alex, down 5 pounds, 30 minutes exercise");
   });
 
+  it("appends a self marker when isSelf is true", () => {
+    const name = boardMemberAccessibleName(
+      2,
+      {
+        name: "Erik",
+        mins: 30,
+        weight: { kind: "range", delta: -3, latestLbs: 197, startLbs: 200 },
+      },
+      true
+    );
+    assert.equal(name, "2. Erik, down 3 pounds, 30 minutes exercise, you");
+  });
+
   it("handles empty weigh-ins and singular minute", () => {
     assert.equal(
       boardMemberAccessibleName(2, {

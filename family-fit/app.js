@@ -262,7 +262,7 @@ function renderBoard() {
     const youBadge = isSelf
       ? '<span class="member-you" aria-hidden="true">You</span>'
       : "";
-    const a11yName = boardMemberAccessibleName(rank, m);
+    const a11yName = boardMemberAccessibleName(rank, m, isSelf);
 
     return `<li class="leaderboard-item">
       <article class="member-card${selfClass}"${selfAttr} aria-label="${escapeHtml(a11yName)}">
