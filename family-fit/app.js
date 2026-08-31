@@ -216,12 +216,25 @@ function setBoardSort(mode) {
   if (boardMembers) renderBoard();
 }
 
+function emptyStateHtml({ title, body, ctaLabel, logMode, compact = false }) {
+  const cls = compact ? "empty-state empty-state--compact" : "empty-state";
+  return `<div class="${cls}">
+    <p class="empty-state__title">${escapeHtml(title)}</p>
+    <p class="empty-state__body">${escapeHtml(body)}</p>
+    <button type="button" class="btn-primary empty-state__cta" data-open-log="${logMode}">${escapeHtml(ctaLabel)}</button>
+  </div>`;
+}
+
 function renderBoard() {
   if (!boardMembers) return;
 
   if (!boardMembers.length) {
-    els.leaderboard.innerHTML =
-      '<p class="muted">No family members yet. Invite users in Supabase Auth.</p>';
+    els.leaderboard.innerHTML = emptyStateHtml({
+      title: "The board is waiting",
+      body: "You’re first here. Log a weigh-in to put a number on the board — family will show up as they join.",
+      ctaLabel: "Log a weigh-in",
+      logMode: "weight",
+    });
     return;
   }
 
@@ -260,7 +273,18 @@ function renderBoard() {
     </article>`;
   });
 
-  els.leaderboard.innerHTML = cards.join("");
+  const soloNudge =
+    boardMembers.length === 1
+      ? emptyStateHtml({
+          title: "Just you for now",
+          body: "Start the competition with today’s workout — more family will appear here as they sign in.",
+          ctaLabel: "Log exercise",
+          logMode: "exercise",
+          compact: true,
+        })
+      : "";
+
+  els.leaderboard.innerHTML = soloNudge + cards.join("");
 }
 
 async function loadBoard() {
@@ -357,26 +381,44 @@ async function loadMyEntries() {
 
   const rows = [];
   for (const row of w.data || []) {
+    const note = row.note ? " — " + escapeHtml(row.note) : "";
     rows.push({
       kind: "weight",
       id: row.id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      html: `<div class="entry-row" data-kind="weight"><span>Weight ${escapeHtml(String(row.weight_lbs))} lbs${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
+      html: `<div class="entry-row" data-kind="weight" data-id="${escapeHtml(row.id)}">
+        <span class="entry-badge entry-badge--weight">Weight</span>
+        <div class="entry-main">
+          <span class="entry-detail">${escapeHtml(String(row.weight_lbs))} lbs${note}</span>
+          <span class="entry-meta">${escapeHtml(row.recorded_on)}</span>
+        </div>
+      </div>`,
     });
   }
   for (const row of e.data || []) {
+    const note = row.note ? " — " + escapeHtml(row.note) : "";
     rows.push({
       kind: "exercise",
       id: row.id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      html: `<div class="entry-row" data-kind="exercise"><span>${escapeHtml(row.activity)} · ${escapeHtml(String(row.duration_minutes))} min${row.note ? " — " + escapeHtml(row.note) : ""}</span><span class="entry-meta">${escapeHtml(row.recorded_on)}</span></div>`,
+      html: `<div class="entry-row" data-kind="exercise" data-id="${escapeHtml(row.id)}">
+        <span class="entry-badge entry-badge--exercise">Exercise</span>
+        <div class="entry-main">
+          <span class="entry-detail">${escapeHtml(row.activity)} · ${escapeHtml(String(row.duration_minutes))} min${note}</span>
+          <span class="entry-meta">${escapeHtml(row.recorded_on)}</span>
+        </div>
+      </div>`,
     });
   }
   rows.sort((a, b) => (a.sort < b.sort ? 1 : -1));
 
   if (!rows.length) {
-    els.myEntries.innerHTML =
-      '<p class="muted">No entries yet — use Log weight or Log exercise to add one.</p>';
+    els.myEntries.innerHTML = emptyStateHtml({
+      title: "No entries yet",
+      body: "Your weigh-ins and workouts will show up here. Add one to get started.",
+      ctaLabel: "Log a weigh-in",
+      logMode: "weight",
+    });
     return;
   }
 
@@ -467,6 +509,13 @@ function wireForms() {
 
   els.sortExerciseBtn.addEventListener("click", () => setBoardSort("exercise"));
   els.sortWeightBtn.addEventListener("click", () => setBoardSort("weight"));
+
+  els.app.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-open-log]");
+    if (!btn || !els.app.contains(btn)) return;
+    const mode = btn.getAttribute("data-open-log");
+    if (mode === "weight" || mode === "exercise") setLogMode(mode);
+  });
 
   els.profileForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
