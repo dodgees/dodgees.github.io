@@ -563,6 +563,7 @@ async function loadBoard() {
     return;
   }
 
+  if (generation !== loadBoardGeneration) return;
   await resolveAvatarUrls(profiles.map((p) => p.avatar_path));
   if (generation !== loadBoardGeneration) return;
 
