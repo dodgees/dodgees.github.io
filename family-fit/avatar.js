@@ -25,6 +25,8 @@ const EXTENSION_FALLBACK_MIMES = new Set([
   "",
   "application/octet-stream",
   "image/jpg",
+  "image/x-png",
+  "image/pjpeg",
 ]);
 
 function hasAcceptedAvatarExtension(file) {

@@ -231,6 +231,13 @@ function handleBoardAvatarError(ev) {
   avatar.appendChild(span);
 }
 
+function reconcileMyAvatarPathFromBoard() {
+  const selfId = session?.user?.id;
+  if (!selfId || !boardMembers) return;
+  const self = boardMembers.find((m) => m.id === selfId);
+  if (self) myAvatarPath = self.avatarPath;
+}
+
 function syncProfileAvatarUi() {
   const url = myAvatarPath ? avatarUrlByPath.get(myAvatarPath) || null : null;
   renderAvatarSlot(els.profileAvatarInitials, els.profileAvatarImg, {
@@ -675,6 +682,7 @@ function escapeHtml(str) {
 
 async function refreshAppData() {
   await Promise.all([loadProfile(), loadBoard(), loadMyEntries()]);
+  reconcileMyAvatarPathFromBoard();
   syncProfileAvatarUi();
 }
 

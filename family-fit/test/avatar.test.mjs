@@ -57,6 +57,22 @@ describe("validateAvatarFile", () => {
       }),
       null
     );
+    assert.equal(
+      validateAvatarFile({
+        type: "image/x-png",
+        name: "photo.png",
+        size: 1024,
+      }),
+      null
+    );
+    assert.equal(
+      validateAvatarFile({
+        type: "image/pjpeg",
+        name: "photo.jpeg",
+        size: 1024,
+      }),
+      null
+    );
   });
 });
 
