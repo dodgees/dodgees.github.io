@@ -37,6 +37,39 @@ export function formatWeightDelta(delta) {
 }
 
 /**
+ * Spoken weight phrase for board accessible names.
+ * @param {{ kind?: string, delta: number|null, primary?: string }} weight
+ */
+export function weightPhraseForA11y(weight) {
+  if (!weight || weight.kind === "empty") return "no weigh-ins";
+  if (weight.kind === "single") {
+    const lbs = weight.latestLbs ?? weight.startLbs;
+    if (lbs == null || Number.isNaN(lbs)) return "one weigh-in logged";
+    return `${lbs} pounds`;
+  }
+  const delta = weight.delta;
+  if (delta == null || Number.isNaN(delta)) return "no weight change recorded";
+  const mag = Math.abs(delta);
+  const pounds = Number.isInteger(mag) ? String(mag) : mag.toFixed(1);
+  if (delta < 0) return `down ${pounds} pounds`;
+  if (delta > 0) return `up ${pounds} pounds`;
+  return "no weight change";
+}
+
+/**
+ * Coherent ranked accessible name, e.g. "1. Alex, down 5 pounds, 30 minutes exercise".
+ * @param {number} rank 1-based
+ * @param {{ name: string, mins: number, weight: object }} member
+ */
+export function boardMemberAccessibleName(rank, member) {
+  const name = member?.name || "Family member";
+  const weightPart = weightPhraseForA11y(member?.weight);
+  const mins = Number(member?.mins) || 0;
+  const exercisePart = `${mins} ${mins === 1 ? "minute" : "minutes"} exercise`;
+  return `${rank}. ${name}, ${weightPart}, ${exercisePart}`;
+}
+
+/**
  * Structured weigh-in summary for the competition board.
  * Stable order: recorded_on asc, then created_at asc.
  * Board cards use primary (glance delta/latest) and secondary (start→latest);
