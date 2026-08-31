@@ -399,7 +399,7 @@ async function loadProfile() {
   if (name) {
     els.whoami.textContent = `${name} · ${session.user.email}`;
   }
-  await resolveAvatarUrls(myAvatarPath ? [myAvatarPath] : []);
+  await resolveAvatarUrls(myAvatarPath ? [myAvatarPath] : [], { retainPaths: true });
   syncProfileAvatarUi();
 }
 

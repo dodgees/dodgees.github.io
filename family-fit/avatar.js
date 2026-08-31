@@ -49,11 +49,19 @@ export function avatarObjectPath(userId, ext = "webp") {
  * @param {File} file
  * @returns {Promise<{ blob: Blob, contentType: string, ext: "webp"|"jpeg"|"png" }>}
  */
+async function decodeImageBitmap(file) {
+  try {
+    return await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    return await createImageBitmap(file);
+  }
+}
+
 export async function prepareAvatarFile(file) {
   const err = validateAvatarFile(file);
   if (err) throw new Error(err);
 
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await decodeImageBitmap(file);
   try {
     const scale = Math.min(
       1,
