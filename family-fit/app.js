@@ -71,8 +71,10 @@ let myAvatarPath = null;
 let myDisplayName = "";
 /** Bumped on avatar upload/remove so in-flight profile/board loads cannot overwrite. */
 let avatarRevision = 0;
-/** Latest loadBoard call; older completions are discarded. */
+/** Latest loadBoard call; older completions are discarded after a newer one renders. */
 let loadBoardGeneration = 0;
+/** Last loadBoard generation that rendered boardMembers. */
+let loadBoardRenderedGeneration = 0;
 /** Map storage path → signed URL (refreshed on each board/profile load). */
 const avatarUrlByPath = new Map();
 const avatarPathsInUse = new Set();
@@ -383,6 +385,7 @@ function renderSignedOut() {
   myDisplayName = "";
   avatarRevision = 0;
   loadBoardGeneration = 0;
+  loadBoardRenderedGeneration = 0;
   avatarUrlByPath.clear();
   avatarPathsInUse.clear();
   clearAvatarUrlRefresh();
@@ -525,6 +528,19 @@ function renderBoard() {
     `<ul class="leaderboard-list" aria-label="Competition board ranked list">${cards.join("")}</ul>`;
 }
 
+function loadBoardResultIsStale(generation) {
+  return generation < loadBoardRenderedGeneration;
+}
+
+function loadBoardErrorShouldKeepBoard(generation) {
+  return boardMembers !== null && generation > loadBoardRenderedGeneration;
+}
+
+function commitLoadBoardRender(generation) {
+  loadBoardRenderedGeneration = generation;
+  setBoardError("");
+}
+
 async function loadBoard() {
   const generation = ++loadBoardGeneration;
   setBoardError("");
@@ -548,7 +564,9 @@ async function loadBoard() {
   ]);
 
   if (profilesRes.error || weighRes.error || exerciseRes.error) {
+    if (loadBoardResultIsStale(generation)) return;
     if (generation !== loadBoardGeneration) return;
+    if (loadBoardErrorShouldKeepBoard(generation)) return;
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(err.message);
     els.leaderboard.innerHTML = "";
@@ -557,15 +575,16 @@ async function loadBoard() {
 
   const profiles = profilesRes.data || [];
   if (!profiles.length) {
-    if (generation !== loadBoardGeneration) return;
+    if (loadBoardResultIsStale(generation)) return;
     boardMembers = [];
+    commitLoadBoardRender(generation);
     renderBoard();
     return;
   }
 
-  if (generation !== loadBoardGeneration) return;
+  if (loadBoardResultIsStale(generation)) return;
   await resolveAvatarUrls(profiles.map((p) => p.avatar_path));
-  if (generation !== loadBoardGeneration) return;
+  if (loadBoardResultIsStale(generation)) return;
 
   const weighByUser = new Map();
   for (const row of weighRes.data || []) {
@@ -596,6 +615,7 @@ async function loadBoard() {
     };
   });
 
+  commitLoadBoardRender(generation);
   syncSortControls();
   renderBoard();
 }
