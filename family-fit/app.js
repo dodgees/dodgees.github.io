@@ -351,13 +351,15 @@ async function removeAvatar() {
   const { error: removeError } = await supabase.storage
     .from(AVATAR_BUCKET)
     .remove([oldPath]);
-  if (removeError) {
+
+  const boardRefreshed = await loadBoard();
+  if (!boardRefreshed) {
+    showStatus("Photo removed from profile, but the board could not be refreshed.", "error");
+  } else if (removeError) {
     showStatus("Photo removed from profile; storage cleanup may have failed.", "error");
   } else {
     showStatus("Profile photo removed.", "success");
   }
-
-  await loadBoard();
 }
 
 function setLogMode(mode, { scroll = true, focus = true } = {}) {
@@ -597,6 +599,9 @@ async function loadBoard() {
       )
     ) {
       boardMembers = previousBoardMembers;
+      if (avatarRevAtStart !== avatarRevision) {
+        await patchSelfBoardAvatar();
+      }
       renderBoard();
       return false;
     }
