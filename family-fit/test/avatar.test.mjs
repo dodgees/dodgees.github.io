@@ -73,6 +73,14 @@ describe("validateAvatarFile", () => {
       }),
       null
     );
+    assert.equal(
+      validateAvatarFile({
+        type: "image/jfif",
+        name: "photo.jpg",
+        size: 1024,
+      }),
+      null
+    );
   });
 });
 

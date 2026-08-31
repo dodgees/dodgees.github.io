@@ -25,6 +25,7 @@ const EXTENSION_FALLBACK_MIMES = new Set([
   "",
   "application/octet-stream",
   "image/jpg",
+  "image/jfif",
   "image/x-png",
   "image/pjpeg",
 ]);

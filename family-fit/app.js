@@ -69,6 +69,10 @@ let boardMembers = null;
 let myAvatarPath = null;
 /** @type {string|null} */
 let myDisplayName = "";
+/** Bumped on avatar upload/remove so in-flight profile/board loads cannot overwrite. */
+let avatarRevision = 0;
+/** Latest loadBoard call; older completions are discarded. */
+let loadBoardGeneration = 0;
 /** Map storage path → signed URL (refreshed on each board/profile load). */
 const avatarUrlByPath = new Map();
 const avatarPathsInUse = new Set();
@@ -295,6 +299,7 @@ async function uploadAvatar(file) {
   const result = profileUpdateStatus(data, error);
   if (!result.ok) throw new Error(result.message);
 
+  avatarRevision += 1;
   myAvatarPath = path;
   await resolveAvatarUrls([path], { retainPaths: true });
   syncProfileAvatarUi();
@@ -315,6 +320,7 @@ async function removeAvatar() {
   const result = profileUpdateStatus(data, error);
   if (!result.ok) throw new Error(result.message);
 
+  avatarRevision += 1;
   myAvatarPath = null;
   syncProfileAvatarUi();
 
@@ -375,6 +381,8 @@ function renderSignedOut() {
   document.body.classList.remove("has-log-dock");
   myAvatarPath = null;
   myDisplayName = "";
+  avatarRevision = 0;
+  loadBoardGeneration = 0;
   avatarUrlByPath.clear();
   avatarPathsInUse.clear();
   clearAvatarUrlRefresh();
@@ -393,6 +401,7 @@ function renderSignedIn(user) {
 }
 
 async function loadProfile() {
+  const avatarRevAtStart = avatarRevision;
   const { data, error } = await supabase
     .from("profiles")
     .select("display_name, avatar_path")
@@ -401,7 +410,9 @@ async function loadProfile() {
   if (error) throw error;
   const name = data?.display_name || "";
   myDisplayName = name;
-  myAvatarPath = data?.avatar_path || null;
+  if (avatarRevAtStart === avatarRevision) {
+    myAvatarPath = data?.avatar_path || null;
+  }
   els.profileForm.display_name.value = name;
   if (name) {
     els.whoami.textContent = `${name} · ${session.user.email}`;
@@ -515,6 +526,7 @@ function renderBoard() {
 }
 
 async function loadBoard() {
+  const generation = ++loadBoardGeneration;
   setBoardError("");
   els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
   boardMembers = null;
@@ -536,6 +548,7 @@ async function loadBoard() {
   ]);
 
   if (profilesRes.error || weighRes.error || exerciseRes.error) {
+    if (generation !== loadBoardGeneration) return;
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(err.message);
     els.leaderboard.innerHTML = "";
@@ -544,12 +557,14 @@ async function loadBoard() {
 
   const profiles = profilesRes.data || [];
   if (!profiles.length) {
+    if (generation !== loadBoardGeneration) return;
     boardMembers = [];
     renderBoard();
     return;
   }
 
   await resolveAvatarUrls(profiles.map((p) => p.avatar_path));
+  if (generation !== loadBoardGeneration) return;
 
   const weighByUser = new Map();
   for (const row of weighRes.data || []) {
@@ -681,8 +696,11 @@ function escapeHtml(str) {
 }
 
 async function refreshAppData() {
+  const avatarRevAtStart = avatarRevision;
   await Promise.all([loadProfile(), loadBoard(), loadMyEntries()]);
-  reconcileMyAvatarPathFromBoard();
+  if (avatarRevAtStart === avatarRevision) {
+    reconcileMyAvatarPathFromBoard();
+  }
   syncProfileAvatarUi();
 }
 
