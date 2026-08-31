@@ -20,6 +20,20 @@ export const AVATAR_ACCEPTED_TYPES = Object.freeze([
 ]);
 
 const ACCEPTED_SET = new Set(AVATAR_ACCEPTED_TYPES);
+const ACCEPTED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+
+function hasAcceptedAvatarExtension(file) {
+  const name = String(file.name || "").toLowerCase();
+  const dot = name.lastIndexOf(".");
+  if (dot < 0) return false;
+  return ACCEPTED_EXTENSIONS.has(name.slice(dot));
+}
+
+function isAcceptedAvatarType(file) {
+  if (ACCEPTED_SET.has(file.type)) return true;
+  if (!file.type && hasAcceptedAvatarExtension(file)) return true;
+  return false;
+}
 
 /**
  * @param {File | null | undefined} file
@@ -27,7 +41,7 @@ const ACCEPTED_SET = new Set(AVATAR_ACCEPTED_TYPES);
  */
 export function validateAvatarFile(file) {
   if (!file) return "Choose a photo to upload.";
-  if (!ACCEPTED_SET.has(file.type)) {
+  if (!isAcceptedAvatarType(file)) {
     return "Use a JPEG, PNG, or WebP photo.";
   }
   if (file.size > AVATAR_MAX_INPUT_BYTES) {

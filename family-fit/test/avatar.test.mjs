@@ -31,6 +31,17 @@ describe("validateAvatarFile", () => {
       null
     );
   });
+
+  it("accepts known extensions when MIME type is missing", () => {
+    assert.equal(
+      validateAvatarFile({ type: "", name: "photo.jpg", size: 1024 }),
+      null
+    );
+    assert.equal(
+      validateAvatarFile({ name: "photo.JPEG", size: 1024 }),
+      null
+    );
+  });
 });
 
 describe("avatarObjectPath", () => {

@@ -289,7 +289,7 @@ async function uploadAvatar(file) {
   if (!result.ok) throw new Error(result.message);
 
   myAvatarPath = path;
-  await resolveAvatarUrls([path]);
+  await resolveAvatarUrls([path], { retainPaths: true });
   syncProfileAvatarUi();
   await loadBoard();
   showStatus("Profile photo updated.", "success");
