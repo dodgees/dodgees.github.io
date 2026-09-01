@@ -2,6 +2,16 @@
 
 Invite-only family weight-loss / healthy-living competition mini-app, served as a static sub-app at `/family-fit/` on this GitHub Pages site. Auth and data live in Supabase (Postgres + Auth). The frontend is vanilla HTML/CSS/JS — no build step.
 
+> ### If you see `column profiles.avatar_path does not exist`
+>
+> Production was never migrated after profile photos shipped. **Do not dig through the full schema** — run this one-shot fix:
+>
+> 1. Open Supabase → **SQL → New query**
+> 2. Paste **[`migrate-avatar-path.sql`](./migrate-avatar-path.sql)** and **Run**
+> 3. Refresh `/family-fit/` — avatars work again; weigh-ins/board keep working either way
+>
+> That file only adds `profiles.avatar_path`, refreshes the profile update policy, and ensures the private `avatars` Storage bucket + policies exist. Safe to re-run.
+
 ## Captain setup (one-time)
 
 ### 1. Create a Supabase project
@@ -21,7 +31,7 @@ Invite-only family weight-loss / healthy-living competition mini-app, served as 
 3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**, and that `profiles` has an `avatar_path` column.
 4. Confirm **Storage** has a private bucket named **`avatars`** (the SQL creates it; if the insert fails, create it manually — see below).
 
-Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, or log weigh-ins.
+Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, or log weigh-ins. Exception: the live error `column profiles.avatar_path does not exist` — use the one-shot callout at the top ([`migrate-avatar-path.sql`](./migrate-avatar-path.sql)), not a full `schema.sql` re-run.
 
 #### Avatar storage (if the bucket is missing)
 

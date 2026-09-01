@@ -306,9 +306,39 @@ export function personalProgressUnavailable() {
   };
 }
 
+/**
+ * True when PostgREST/Postgres reports profiles.avatar_path is missing
+ * (production never migrated after the avatar feature shipped).
+ * @param {{ message?: string, details?: string, hint?: string, code?: string } | null | undefined} error
+ */
+export function isMissingAvatarPathError(error) {
+  if (!error) return false;
+  const msg = [error.message, error.details, error.hint]
+    .filter(Boolean)
+    .join(" ");
+  if (!/avatar_path/i.test(msg)) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  return /does not exist|could not find/i.test(msg);
+}
+
+/** Calm captain-facing copy when avatar_path is missing (not a raw PostgREST dump). */
+export function missingAvatarPathOperatorMessage() {
+  return (
+    "Profile photos need a one-time database update. Ask the captain to run " +
+    "family-fit/migrate-avatar-path.sql in the Supabase SQL editor " +
+    '(README: if you see “column profiles.avatar_path does not exist”). ' +
+    "Weigh-ins, exercise, and the board still work — initials show until then."
+  );
+}
+
 /** Profile update: PostgREST can return [] with no error — treat as failure. */
 export function profileUpdateStatus(data, error) {
-  if (error) return { ok: false, message: error.message || String(error) };
+  if (error) {
+    if (isMissingAvatarPathError(error)) {
+      return { ok: false, message: missingAvatarPathOperatorMessage() };
+    }
+    return { ok: false, message: error.message || String(error) };
+  }
   if (!data?.length) {
     return {
       ok: false,
