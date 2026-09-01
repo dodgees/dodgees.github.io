@@ -1068,6 +1068,13 @@ function wireForms() {
         setAuthMode("signin");
         els.authForm.email.value = email;
         els.authForm.password.value = "";
+        // Confirm-email ON + already-registered email: error=null, session=null, identities=[].
+        if (!data.user?.identities?.length) {
+          setAuthNotice(
+            "This email may already have an account. Sign in here, or ask the captain to reset your password in Supabase."
+          );
+          return;
+        }
         setAuthNotice(
           "Account created. Check your email to confirm, then sign in here. If no email arrives, ask the captain to turn off “Confirm email” in Supabase Auth."
         );
