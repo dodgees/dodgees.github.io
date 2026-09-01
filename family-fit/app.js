@@ -30,6 +30,12 @@ const els = {
   app: document.getElementById("app-panel"),
   authForm: document.getElementById("sign-in-form"),
   authError: document.getElementById("auth-error"),
+  authNotice: document.getElementById("auth-notice"),
+  authHint: document.getElementById("auth-hint"),
+  authSubmitBtn: document.getElementById("auth-submit-btn"),
+  authModeSignin: document.getElementById("auth-mode-signin"),
+  authModeSignup: document.getElementById("auth-mode-signup"),
+  confirmPasswordField: document.getElementById("confirm-password-field"),
   signOut: document.getElementById("sign-out-btn"),
   whoami: document.getElementById("whoami"),
   editNameBtn: document.getElementById("edit-name-btn"),
@@ -63,6 +69,8 @@ const els = {
 
 let supabase = null;
 let session = null;
+/** @type {"signin"|"signup"} */
+let authMode = "signin";
 /** @type {"weight"|"exercise"|null} */
 let activeLog = null;
 /** @type {{ kind: "weight"|"exercise", id: string } | null} */
@@ -156,6 +164,60 @@ function showStatus(msg, kind = "success") {
 function setAuthError(msg) {
   els.authError.hidden = !msg;
   els.authError.textContent = msg || "";
+}
+
+function setAuthNotice(msg) {
+  els.authNotice.hidden = !msg;
+  els.authNotice.textContent = msg || "";
+}
+
+function setAuthMode(mode) {
+  authMode = mode === "signup" ? "signup" : "signin";
+  const signup = authMode === "signup";
+  els.authModeSignin.classList.toggle("is-active", !signup);
+  els.authModeSignup.classList.toggle("is-active", signup);
+  els.authModeSignin.setAttribute("aria-pressed", signup ? "false" : "true");
+  els.authModeSignup.setAttribute("aria-pressed", signup ? "true" : "false");
+  els.confirmPasswordField.hidden = !signup;
+  const confirmInput = els.authForm.confirm_password;
+  if (confirmInput) {
+    confirmInput.required = signup;
+    confirmInput.disabled = !signup;
+    if (!signup) confirmInput.value = "";
+  }
+  const passwordInput = els.authForm.password;
+  if (passwordInput) {
+    passwordInput.autocomplete = signup ? "new-password" : "current-password";
+    passwordInput.enterKeyHint = "go";
+  }
+  const submitLabel = signup ? "Create account" : "Sign in";
+  els.authSubmitBtn.textContent = submitLabel;
+  if (els.authSubmitBtn.dataset.label) {
+    els.authSubmitBtn.dataset.label = submitLabel;
+  }
+  els.authHint.textContent = signup
+    ? "Create an account with email and password. If email confirmation is on, check your inbox then sign in; otherwise the family board opens right away. Share this page only with family."
+    : "Forgot your password? Ask the captain for help resetting it in Supabase — there’s no self-serve reset here.";
+  setAuthError("");
+  setAuthNotice("");
+}
+
+function authRedirectTo() {
+  try {
+    const url = new URL(window.location.href);
+    let path = url.pathname;
+    if (/\.html?$/i.test(path)) {
+      path = path.replace(/[^/]+$/, "");
+    } else if (!path.endsWith("/")) {
+      path += "/";
+    }
+    url.pathname = path;
+    url.search = "";
+    url.hash = "";
+    return url.href;
+  } catch {
+    return String(window.location.href).replace(/[?#].*$/, "");
+  }
 }
 
 function setBoardError(msg, { soft = false } = {}) {
@@ -965,8 +1027,10 @@ async function refreshAppData() {
 }
 
 async function onSession(next) {
+  const wasSignedIn = Boolean(session);
   session = next;
   if (!session) {
+    if (wasSignedIn) setAuthMode("signin");
     renderSignedOut();
     return;
   }
@@ -983,14 +1047,51 @@ async function onSession(next) {
 }
 
 function wireForms() {
+  els.authModeSignin.addEventListener("click", () => setAuthMode("signin"));
+  els.authModeSignup.addEventListener("click", () => setAuthMode("signup"));
+
   els.authForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     setAuthError("");
+    setAuthNotice("");
     setSubmitting(els.authForm, true);
     const fd = new FormData(els.authForm);
     const email = String(fd.get("email") || "").trim();
     const password = String(fd.get("password") || "");
     try {
+      if (authMode === "signup") {
+        const confirm = String(fd.get("confirm_password") || "");
+        if (password !== confirm) {
+          setAuthError("Passwords do not match.");
+          return;
+        }
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: authRedirectTo() },
+        });
+        if (error) {
+          setAuthError(error.message);
+          return;
+        }
+        // Immediate session = email confirm off (or already confirmed). Else ask to check inbox.
+        if (data.session) return;
+        setAuthMode("signin");
+        els.authForm.email.value = email;
+        els.authForm.password.value = "";
+        // Confirm-email ON + already-registered email: error=null, session=null, identities=[].
+        if (!data.user?.identities?.length) {
+          setAuthNotice(
+            "This email may already have an account. Sign in here, or ask the captain to reset your password in Supabase."
+          );
+          return;
+        }
+        setAuthNotice(
+          "Account created. Check your email to confirm, then sign in here. If no email arrives, ask the captain to turn off “Confirm email” in Supabase Auth."
+        );
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setAuthError(error.message);
     } finally {
@@ -1173,6 +1274,7 @@ async function main() {
     },
   });
 
+  setAuthMode("signin");
   wireForms();
   syncSortControls();
 

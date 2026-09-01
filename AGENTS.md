@@ -4,7 +4,7 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 - Add durable project-specific notes here as they are discovered through real work.
 - Flat static GitHub Pages site; side projects live as path folders (e.g. `/picket/`, `/family-fit/`) and are linked from the homepage easter-egg side-projects list in `index.html`.
-- Family Fit (`family-fit/`): invite-only Supabase auth + Postgres mini-app. Setup and invite steps: `family-fit/README.md`. Schema/RLS: `family-fit/schema.sql`. Live `avatar_path` missing → captain one-shot `family-fit/migrate-avatar-path.sql`. Public anon config only in `family-fit/config.js` — never commit `service_role`.
+- Family Fit (`family-fit/`): email/password Supabase auth (open create-account) + Postgres mini-app. Setup: `family-fit/README.md`. Schema/RLS: `family-fit/schema.sql`. Live `avatar_path` missing → captain one-shot `family-fit/migrate-avatar-path.sql`. Public anon config only in `family-fit/config.js` — never commit `service_role`.
 
 ## Maintaining this file
 
