@@ -189,7 +189,11 @@ function setAuthMode(mode) {
     passwordInput.autocomplete = signup ? "new-password" : "current-password";
     passwordInput.enterKeyHint = "go";
   }
-  els.authSubmitBtn.textContent = signup ? "Create account" : "Sign in";
+  const submitLabel = signup ? "Create account" : "Sign in";
+  els.authSubmitBtn.textContent = submitLabel;
+  if (els.authSubmitBtn.dataset.label) {
+    els.authSubmitBtn.dataset.label = submitLabel;
+  }
   els.authHint.textContent = signup
     ? "After you create an account, the app opens the family board. Share this page only with family."
     : "Forgot your password? Ask the captain for help resetting it in Supabase — there’s no self-serve reset here.";
@@ -509,6 +513,7 @@ function renderSignedOut() {
   setProfileEditorOpen(false);
   collapseLogForms();
   setAuthError("");
+  setAuthNotice("");
   if (els.personalProgress) {
     els.personalProgress.innerHTML = '<p class="muted">Loading…</p>';
   }
