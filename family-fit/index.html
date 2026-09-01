@@ -21,7 +21,7 @@
   <div class="atmosphere" aria-hidden="true"></div>
   <main class="page">
     <header class="app-header">
-      <p class="eyebrow"><a href="/">Erik Dodge</a></p>
+      <p class="eyebrow">Erik Dodge</p>
       <h1>Family Fit</h1>
       <p class="lede">Our family’s healthy-living competition — log weight and exercise, cheer each other on.</p>
     </header>
@@ -61,7 +61,6 @@
           </div>
           <button type="button" id="edit-name-btn" class="btn-link" aria-expanded="false" aria-controls="profile-editor">Edit profile</button>
         </div>
-        <button type="button" id="sign-out-btn" class="btn-quiet">Sign out</button>
       </div>
 
       <div id="profile-editor" class="profile-editor" hidden>
@@ -87,6 +86,9 @@
           </label>
           <button type="submit" class="btn-primary">Save</button>
         </form>
+        <div class="profile-account-actions">
+          <button type="button" id="sign-out-btn" class="btn-quiet">Sign out</button>
+        </div>
       </div>
 
       <section class="panel progress-section" id="progress-section" aria-labelledby="progress-heading">
@@ -191,10 +193,6 @@
     </section>
 
     <div id="form-status" class="toast" role="status" aria-live="polite" hidden></div>
-
-    <footer class="app-footer">
-      <p><a href="/">← Back to erikdodge.com</a></p>
-    </footer>
   </main>
 
   <script src="config.js"></script>
