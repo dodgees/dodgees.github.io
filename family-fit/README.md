@@ -18,9 +18,23 @@ Invite-only family weight-loss / healthy-living competition mini-app, served as 
 
 1. In the Supabase dashboard: **SQL → New query**.
 2. Paste the contents of [`schema.sql`](./schema.sql) and run it.
-3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**.
+3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**, and that `profiles` has an `avatar_path` column.
+4. Confirm **Storage** has a private bucket named **`avatars`** (the SQL creates it; if the insert fails, create it manually — see below).
 
-Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name or log weigh-ins.
+Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, or log weigh-ins.
+
+#### Avatar storage (if the bucket is missing)
+
+If **Storage → avatars** does not appear after running `schema.sql`:
+
+1. **Storage → New bucket**
+2. Name: **`avatars`**
+3. **Public bucket**: off (private)
+4. Allowed MIME types: `image/jpeg`, `image/png`, `image/webp`
+5. File size limit: **512 KB** (524288 bytes)
+6. Re-run the storage policy section at the bottom of [`schema.sql`](./schema.sql) (from the `storage.buckets` insert through the four `avatars_*` policies).
+
+Members upload photos from **Edit profile** in the app. Paths are stored on `profiles.avatar_path`; the competition board shows signed-in family avatars after refresh.
 
 ### 3. Disable public self-signup (invite-only)
 
@@ -90,6 +104,7 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 | Feature | Who |
 | --- | --- |
 | Sign in | Invited family only; password recovery is a fresh captain invite (no self-serve reset) |
+| Profile photo | Upload/replace/remove JPEG, PNG, or WebP (client-resized); shown on profile and board |
 | Log weight | Own entries only (write) |
 | Log exercise | Own entries only (write) |
 | Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
@@ -98,7 +113,7 @@ Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for 
 
 ## Schema overview
 
-- **profiles** — `id` = `auth.users.id`, `display_name`
+- **profiles** — `id` = `auth.users.id`, `display_name`, optional `avatar_path` (Storage object path)
 - **weigh_ins** — `user_id`, `weight_lbs`, `recorded_on`, optional `note`
 - **exercise_logs** — `user_id`, `activity`, `duration_minutes`, `recorded_on`, optional `note`
 

@@ -12,6 +12,7 @@ import {
   weightPhraseForA11y,
   weightSummaryFromSeries,
   writeBoardSortPreference,
+  loadBoardErrorShouldKeepBoard,
   BOARD_SORT_STORAGE_KEY,
 } from "../board-math.js";
 
@@ -205,5 +206,14 @@ describe("profileUpdateStatus (zero-row is failure)", () => {
     const res = profileUpdateStatus([{ id: "abc" }], null);
     assert.equal(res.ok, true);
     assert.equal(res.message, "Display name saved.");
+  });
+});
+
+describe("loadBoardErrorShouldKeepBoard", () => {
+  it("keeps the prior board when a superseding refresh fails", () => {
+    const previousBoard = [{ id: "a", name: "Alex" }];
+    assert.equal(loadBoardErrorShouldKeepBoard(2, previousBoard, 1), true);
+    assert.equal(loadBoardErrorShouldKeepBoard(2, null, 1), false);
+    assert.equal(loadBoardErrorShouldKeepBoard(1, previousBoard, 1), false);
   });
 });

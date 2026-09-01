@@ -8,10 +8,15 @@
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null,
+  avatar_path text,
   created_at timestamptz not null default now()
 );
 
-comment on table public.profiles is 'Family member display names for the competition.';
+comment on table public.profiles is 'Family member display names and optional avatar paths for the competition.';
+comment on column public.profiles.avatar_path is 'Object path in the avatars storage bucket, e.g. {user_id}/avatar.webp';
+
+-- Additive migration for projects that ran an older schema.sql
+alter table public.profiles add column if not exists avatar_path text;
 
 -- ---------------------------------------------------------------------------
 -- Weigh-ins
@@ -108,7 +113,13 @@ create policy "profiles_update_own"
   on public.profiles for update
   to authenticated
   using (auth.uid() = id)
-  with check (auth.uid() = id);
+  with check (
+    auth.uid() = id
+    and (
+      avatar_path is null
+      or avatar_path ~ ('^' || auth.uid()::text || '/avatar\.(webp|jpe?g|png)$')
+    )
+  );
 
 -- No insert/delete for clients; profile rows come from the auth trigger or the backfill above.
 
@@ -165,3 +176,58 @@ create policy "exercise_logs_delete_own"
   using (auth.uid() = user_id);
 
 -- anon role has no policies → no public anonymous read of health data.
+
+-- ---------------------------------------------------------------------------
+-- Avatars (Supabase Storage)
+-- Captain: create bucket "avatars" in Dashboard → Storage if this INSERT fails.
+-- Private bucket; signed-in family reads via storage RLS + createSignedUrl in the app.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'avatars',
+  'avatars',
+  false,
+  524288,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "avatars_select_authenticated" on storage.objects;
+create policy "avatars_select_authenticated"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'avatars');
+
+drop policy if exists "avatars_insert_own" on storage.objects;
+create policy "avatars_insert_own"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_update_own" on storage.objects;
+create policy "avatars_update_own"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_delete_own" on storage.objects;
+create policy "avatars_delete_own"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
