@@ -10,6 +10,8 @@ import {
   competitionSinceDay,
   localDateISO,
   loadBoardErrorShouldKeepBoard,
+  personalProgressFromSummary,
+  personalProgressUnavailable,
   profileUpdateStatus,
   readBoardSortPreference,
   sortBoardMembers,
@@ -53,6 +55,7 @@ const els = {
   sortExerciseBtn: document.getElementById("sort-exercise-btn"),
   sortWeightBtn: document.getElementById("sort-weight-btn"),
   myEntries: document.getElementById("my-entries"),
+  personalProgress: document.getElementById("personal-progress"),
   status: document.getElementById("form-status"),
 };
 
@@ -425,6 +428,9 @@ function renderSignedOut() {
   clearAvatarUrlRefresh();
   setProfileEditorOpen(false);
   collapseLogForms();
+  if (els.personalProgress) {
+    els.personalProgress.innerHTML = '<p class="muted">Loading…</p>';
+  }
 }
 
 function renderSignedIn(user) {
@@ -483,10 +489,77 @@ function setBoardSort(mode) {
 
 function emptyStateHtml({ title, body, ctaLabel, logMode, compact = false }) {
   const cls = compact ? "empty-state empty-state--compact" : "empty-state";
+  const cta =
+    ctaLabel && logMode
+      ? `<button type="button" class="btn-primary empty-state__cta" data-open-log="${escapeHtml(logMode)}">${escapeHtml(ctaLabel)}</button>`
+      : "";
   return `<div class="${cls}">
     <p class="empty-state__title">${escapeHtml(title)}</p>
     <p class="empty-state__body">${escapeHtml(body)}</p>
-    <button type="button" class="btn-primary empty-state__cta" data-open-log="${logMode}">${escapeHtml(ctaLabel)}</button>
+    ${cta}
+  </div>`;
+}
+
+function progressHeroClass(changeTone) {
+  if (changeTone === "down") return " personal-progress__hero--down";
+  if (changeTone === "up") return " personal-progress__hero--up";
+  return "";
+}
+
+function renderPersonalProgress(progress) {
+  if (!els.personalProgress) return;
+  if (!progress) {
+    els.personalProgress.innerHTML = '<p class="muted">Loading…</p>';
+    return;
+  }
+
+  if (progress.kind === "empty" || progress.kind === "unavailable") {
+    const exerciseNote =
+      progress.kind === "empty" && progress.exerciseMinutes > 0
+        ? `<p class="personal-progress__exercise-alone">${escapeHtml(progress.exerciseLabel)} exercise so far — add a weigh-in to track weight change.</p>`
+        : "";
+    els.personalProgress.innerHTML =
+      emptyStateHtml({
+        title: progress.emptyTitle,
+        body: progress.emptyBody,
+        ctaLabel: progress.cta?.label,
+        logMode: progress.cta?.logMode,
+      }) + exerciseNote;
+    return;
+  }
+
+  const heroBlock =
+    progress.hero != null
+      ? `<div class="personal-progress__hero-wrap">
+          <p class="personal-progress__hero${progressHeroClass(progress.changeTone)}">${escapeHtml(progress.hero)}</p>
+          <p class="personal-progress__hero-caption">${escapeHtml(progress.heroCaption)}</p>
+        </div>`
+      : `<div class="personal-progress__hero-wrap personal-progress__hero-wrap--pending">
+          <p class="personal-progress__hero-caption">${escapeHtml(progress.heroCaption)}</p>
+        </div>`;
+
+  const cta =
+    progress.cta != null
+      ? `<button type="button" class="btn-primary personal-progress__cta" data-open-log="${escapeHtml(progress.cta.logMode)}">${escapeHtml(progress.cta.label)}</button>`
+      : "";
+
+  els.personalProgress.innerHTML = `<div class="personal-progress__card">
+    ${heroBlock}
+    <dl class="personal-progress__stats">
+      <div class="personal-progress__stat">
+        <dt>Starting</dt>
+        <dd>${escapeHtml(progress.startDisplay || "—")}</dd>
+      </div>
+      <div class="personal-progress__stat">
+        <dt>Latest</dt>
+        <dd>${escapeHtml(progress.latestDisplay || "—")}</dd>
+      </div>
+      <div class="personal-progress__stat personal-progress__stat--exercise">
+        <dt>Exercise</dt>
+        <dd>${escapeHtml(progress.exerciseLabel)}</dd>
+      </div>
+    </dl>
+    ${cta}
   </div>`;
 }
 
@@ -574,12 +647,27 @@ function commitLoadBoardRender(generation) {
   setBoardError("");
 }
 
+function syncPersonalProgressFromBoard() {
+  const uid = session?.user?.id;
+  if (!uid || !boardMembers) {
+    renderPersonalProgress(personalProgressFromSummary(null, 0));
+    return;
+  }
+  const self = boardMembers.find((m) => m.id === uid);
+  if (!self) {
+    renderPersonalProgress(personalProgressFromSummary(null, 0));
+    return;
+  }
+  renderPersonalProgress(personalProgressFromSummary(self.weight, self.mins));
+}
+
 async function loadBoard() {
   const generation = ++loadBoardGeneration;
   const avatarRevAtStart = avatarRevision;
   const previousRenderedGeneration = loadBoardRenderedGeneration;
   setBoardError("");
   els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
+  renderPersonalProgress(null);
   boardMembers = null;
 
   const sinceDay = competitionSinceDay();
@@ -616,12 +704,14 @@ async function loadBoard() {
       await patchSelfBoardAvatar();
       commitLoadBoardRender(generation);
       renderBoard();
+      syncPersonalProgressFromBoard();
       return true;
     }
     if (boardMembers !== null) return true;
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(err.message);
     els.leaderboard.innerHTML = "";
+    renderPersonalProgress(personalProgressUnavailable());
     return false;
   }
 
@@ -631,6 +721,7 @@ async function loadBoard() {
     boardMembers = [];
     commitLoadBoardRender(generation);
     renderBoard();
+    syncPersonalProgressFromBoard();
     return true;
   }
 
@@ -679,6 +770,7 @@ async function loadBoard() {
   commitLoadBoardRender(generation);
   syncSortControls();
   renderBoard();
+  syncPersonalProgressFromBoard();
   return true;
 }
 

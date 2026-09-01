@@ -181,6 +181,131 @@ export function weightLineFromSeries(series) {
   return weightSummaryFromSeries(series).text;
 }
 
+function formatLbsLabel(lbs) {
+  if (lbs == null || Number.isNaN(Number(lbs))) return null;
+  return `${Number(lbs).toFixed(1)} lbs`;
+}
+
+/**
+ * Personal progress from a board weight summary + exercise minutes.
+ * Same math as the competition board for the signed-in member.
+ *
+ * @param {ReturnType<typeof weightSummaryFromSeries>} weight
+ * @param {number} [exerciseMinutes]
+ */
+export function personalProgressFromSummary(weight, exerciseMinutes = 0) {
+  const mins = Math.max(0, Number(exerciseMinutes) || 0);
+  const exerciseLabel = `${mins} ${mins === 1 ? "minute" : "minutes"}`;
+  const summary = weight || weightSummaryFromSeries([]);
+
+  if (summary.kind === "empty") {
+    return {
+      kind: "empty",
+      weight: summary,
+      exerciseMinutes: mins,
+      exerciseLabel,
+      hero: null,
+      heroCaption: null,
+      changeTone: null,
+      startLbs: null,
+      latestLbs: null,
+      startDisplay: null,
+      latestDisplay: null,
+      cta: { logMode: "weight", label: "Log weight" },
+      emptyTitle: "Your progress starts here",
+      emptyBody:
+        "Log a weigh-in to see starting weight, latest, and total change over the last 30 days.",
+    };
+  }
+
+  if (summary.kind === "single") {
+    const lbs = summary.latestLbs;
+    const display = formatLbsLabel(lbs);
+    return {
+      kind: "single",
+      weight: summary,
+      exerciseMinutes: mins,
+      exerciseLabel,
+      hero: null,
+      heroCaption: "Log another weigh-in to see total change",
+      changeTone: null,
+      startLbs: lbs,
+      latestLbs: lbs,
+      startDisplay: display,
+      latestDisplay: display,
+      cta: { logMode: "weight", label: "Log another weigh-in" },
+      emptyTitle: null,
+      emptyBody: null,
+    };
+  }
+
+  const delta = summary.delta;
+  let heroCaption = "no change";
+  let changeTone = "flat";
+  if (delta < 0) {
+    heroCaption = "total lost";
+    changeTone = "down";
+  } else if (delta > 0) {
+    heroCaption = "total gained";
+    changeTone = "up";
+  }
+
+  return {
+    kind: "range",
+    weight: summary,
+    exerciseMinutes: mins,
+    exerciseLabel,
+    hero: formatWeightDelta(delta),
+    heroCaption,
+    changeTone,
+    startLbs: summary.startLbs,
+    latestLbs: summary.latestLbs,
+    startDisplay: formatLbsLabel(summary.startLbs),
+    latestDisplay: formatLbsLabel(summary.latestLbs),
+    cta: null,
+    emptyTitle: null,
+    emptyBody: null,
+  };
+}
+
+/**
+ * Personal progress for one member over the competition window.
+ * Start = earliest weigh-in; latest = most recent; delta = latest − start.
+ *
+ * @param {Array<{ weight_lbs: number|string, recorded_on: string, created_at?: string }>} weighSeries
+ * @param {number} [exerciseMinutes]
+ */
+export function personalProgressFromLogs(weighSeries, exerciseMinutes = 0) {
+  return personalProgressFromSummary(
+    weightSummaryFromSeries(weighSeries),
+    exerciseMinutes
+  );
+}
+
+/**
+ * Progress UI when the board failed to load and there is no prior snapshot.
+ * Must not look like a true no-weigh-in empty state (no Log weight CTA).
+ */
+export function personalProgressUnavailable() {
+  return {
+    kind: "unavailable",
+    weight: null,
+    exerciseMinutes: 0,
+    exerciseLabel: null,
+    hero: null,
+    heroCaption: null,
+    changeTone: null,
+    startLbs: null,
+    latestLbs: null,
+    startDisplay: null,
+    latestDisplay: null,
+    cta: null,
+    emptyTitle: "Progress unavailable",
+    emptyBody:
+      "We couldn’t load your weigh-ins right now. Try refreshing — your logs are still saved.",
+  };
+}
+
 /** Profile update: PostgREST can return [] with no error — treat as failure. */
 export function profileUpdateStatus(data, error) {
   if (error) return { ok: false, message: error.message || String(error) };

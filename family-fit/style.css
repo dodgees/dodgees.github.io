@@ -908,6 +908,116 @@ body.has-log-dock .toast {
   min-width: 0;
 }
 
+/* Personal progress — glanceable total change above the board */
+.progress-section {
+  margin-bottom: 1.35rem;
+}
+
+.personal-progress__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.05rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.personal-progress__hero-wrap {
+  text-align: left;
+}
+
+.personal-progress__hero-wrap--pending .personal-progress__hero-caption {
+  margin-top: 0;
+}
+
+.personal-progress__hero {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 8vw, 2.55rem);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.personal-progress__hero--down {
+  color: var(--accent);
+}
+
+.personal-progress__hero--up {
+  color: var(--muted);
+}
+
+.personal-progress__hero-caption {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  text-transform: lowercase;
+}
+
+.personal-progress__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem 0.75rem;
+  margin: 0;
+}
+
+.personal-progress__stat {
+  min-width: 0;
+}
+
+.personal-progress__stat dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.personal-progress__stat dd {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.personal-progress__stat--exercise {
+  grid-column: 1 / -1;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--divider);
+}
+
+.personal-progress__cta {
+  align-self: flex-start;
+  min-height: var(--touch);
+}
+
+.personal-progress__exercise-alone {
+  margin-top: 0.75rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+@media (min-width: 480px) {
+  .personal-progress__stats {
+    grid-template-columns: 1fr 1fr 1.2fr;
+  }
+
+  .personal-progress__stat--exercise {
+    grid-column: auto;
+    padding-top: 0;
+    border-top: none;
+    border-left: 1px solid var(--divider);
+    padding-left: 0.75rem;
+  }
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
