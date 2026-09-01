@@ -20,6 +20,16 @@ import {
   weightSummaryFromSeries,
   writeBoardSortPreference,
 } from "./board-math.js";
+import {
+  COMMENT_MAX_LENGTH,
+  REACTION_EMOJIS,
+  aggregateReactions,
+  entryKey,
+  entryKeyFromRow,
+  entryTargetColumns,
+  findOwnReactionId,
+  normalizeCommentBody,
+} from "./encouragement.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -62,7 +72,7 @@ const els = {
   boardSortStatus: document.getElementById("board-sort-status"),
   sortExerciseBtn: document.getElementById("sort-exercise-btn"),
   sortWeightBtn: document.getElementById("sort-weight-btn"),
-  myEntries: document.getElementById("my-entries"),
+  recentEntries: document.getElementById("recent-entries"),
   personalProgress: document.getElementById("personal-progress"),
   status: document.getElementById("form-status"),
 };
@@ -91,6 +101,19 @@ let loadBoardGeneration = 0;
 let loadBoardRenderedGeneration = 0;
 /** Last committed board snapshot for keep-board when overlapping fetches fail. */
 let lastRenderedBoardMembers = null;
+/** Map entryKey → reaction rows for the visible feed. */
+let reactionsByEntry = new Map();
+/** Map entryKey → comment rows for the visible feed. */
+let commentsByEntry = new Map();
+/** Map profile id → display_name for feed authors. */
+let profileNameById = new Map();
+/** Prevent double-submit on reaction taps. */
+let reactionBusyKey = null;
+/**
+ * Whether profiles.avatar_path exists in production.
+ * null = unknown; false = missing (degrade to initials); true = OK.
+ */
+let avatarPathColumnOk = null;
 /** Map storage path → signed URL (refreshed on each board/profile load). */
 const avatarUrlByPath = new Map();
 const avatarPathsInUse = new Set();
@@ -98,11 +121,6 @@ const AVATAR_SIGNED_URL_TTL_SEC = 3600;
 const AVATAR_SIGNED_URL_REFRESH_MS = (AVATAR_SIGNED_URL_TTL_SEC - 600) * 1000;
 /** @type {ReturnType<typeof setTimeout> | null} */
 let avatarUrlRefreshTimer = null;
-/**
- * Whether profiles.avatar_path exists in production.
- * null = unknown; false = missing (degrade to initials); true = OK.
- */
-let avatarPathColumnOk = null;
 
 function clearAvatarUrlRefresh() {
   clearTimeout(avatarUrlRefreshTimer);
@@ -918,92 +936,399 @@ async function loadBoard() {
   return true;
 }
 
-async function loadMyEntries() {
+async function loadRecentEntries() {
   const mark = highlightTarget;
   highlightTarget = null;
+  const listEl = els.recentEntries;
+  if (!listEl) return;
 
-  els.myEntries.innerHTML = '<p class="muted">Loading…</p>';
+  listEl.innerHTML = '<p class="muted">Loading…</p>';
   const uid = session.user.id;
 
-  const [w, e] = await Promise.all([
+  const [w, e, profilesRes] = await Promise.all([
     supabase
       .from("weigh_ins")
-      .select("id, weight_lbs, recorded_on, note, created_at")
-      .eq("user_id", uid)
+      .select("id, user_id, weight_lbs, recorded_on, note, created_at")
       .order("recorded_on", { ascending: false })
-      .limit(8),
+      .order("created_at", { ascending: false })
+      .limit(16),
     supabase
       .from("exercise_logs")
-      .select("id, activity, duration_minutes, recorded_on, note, created_at")
-      .eq("user_id", uid)
+      .select("id, user_id, activity, duration_minutes, recorded_on, note, created_at")
       .order("recorded_on", { ascending: false })
-      .limit(8),
+      .order("created_at", { ascending: false })
+      .limit(16),
+    supabase.from("profiles").select("id, display_name"),
   ]);
 
   if (w.error || e.error) {
-    els.myEntries.innerHTML = `<p class="error">${escapeHtml((w.error || e.error).message)}</p>`;
+    listEl.innerHTML = `<p class="error">${escapeHtml((w.error || e.error).message)}</p>`;
     return;
   }
 
+  profileNameById = new Map();
+  for (const p of profilesRes.data || []) {
+    profileNameById.set(p.id, p.display_name || "Family member");
+  }
+  if (profilesRes.error && boardMembers) {
+    for (const m of boardMembers) profileNameById.set(m.id, m.name);
+  }
+
+  /** @type {Array<{ kind: "weight"|"exercise", id: string, userId: string, sort: string, detail: string, recordedOn: string }>} */
   const rows = [];
   for (const row of w.data || []) {
-    const note = row.note ? " — " + escapeHtml(row.note) : "";
+    const note = row.note ? " — " + row.note : "";
     rows.push({
       kind: "weight",
       id: row.id,
+      userId: row.user_id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      html: `<div class="entry-row" data-kind="weight" data-id="${escapeHtml(row.id)}">
-        <span class="entry-badge entry-badge--weight">Weight</span>
-        <div class="entry-main">
-          <span class="entry-detail">${escapeHtml(String(row.weight_lbs))} lbs${note}</span>
-          <span class="entry-meta">${escapeHtml(row.recorded_on)}</span>
-        </div>
-      </div>`,
+      detail: `${row.weight_lbs} lbs${note}`,
+      recordedOn: row.recorded_on,
     });
   }
   for (const row of e.data || []) {
-    const note = row.note ? " — " + escapeHtml(row.note) : "";
+    const note = row.note ? " — " + row.note : "";
     rows.push({
       kind: "exercise",
       id: row.id,
+      userId: row.user_id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      html: `<div class="entry-row" data-kind="exercise" data-id="${escapeHtml(row.id)}">
-        <span class="entry-badge entry-badge--exercise">Exercise</span>
-        <div class="entry-main">
-          <span class="entry-detail">${escapeHtml(row.activity)} · ${escapeHtml(String(row.duration_minutes))} min${note}</span>
-          <span class="entry-meta">${escapeHtml(row.recorded_on)}</span>
-        </div>
-      </div>`,
+      detail: `${row.activity} · ${row.duration_minutes} min${note}`,
+      recordedOn: row.recorded_on,
     });
   }
   rows.sort((a, b) => (a.sort < b.sort ? 1 : -1));
+  const visible = rows.slice(0, 14);
 
-  if (!rows.length) {
-    els.myEntries.innerHTML = emptyStateHtml({
+  if (!visible.length) {
+    reactionsByEntry = new Map();
+    commentsByEntry = new Map();
+    listEl.innerHTML = emptyStateHtml({
       title: "No entries yet",
-      body: "Your weigh-ins and workouts will show up here. Add one to get started.",
+      body: "Family weigh-ins and workouts will show up here. Log one to get started — then cheer each other on.",
       ctaLabel: "Log a weigh-in",
       logMode: "weight",
     });
     return;
   }
 
+  const weighIds = visible.filter((r) => r.kind === "weight").map((r) => r.id);
+  const exerciseIds = visible.filter((r) => r.kind === "exercise").map((r) => r.id);
+
+  const [commentsRes, reactionsRes] = await Promise.all([
+    fetchEncouragementRows("entry_comments", weighIds, exerciseIds),
+    fetchEncouragementRows("entry_reactions", weighIds, exerciseIds),
+  ]);
+
+  commentsByEntry = groupByEntryKey(commentsRes.rows || []);
+  reactionsByEntry = groupByEntryKey(reactionsRes.rows || []);
+
+  const encourageError = commentsRes.error || reactionsRes.error;
   let marked = false;
-  els.myEntries.innerHTML = rows
-    .slice(0, 12)
-    .map((r) => {
-      if (mark && !marked && r.kind === mark.kind && r.id === mark.id) {
-        marked = true;
-        return r.html.replace('class="entry-row"', 'class="entry-row is-fresh"');
-      }
-      return r.html;
-    })
-    .join("");
+  listEl.innerHTML =
+    (encourageError
+      ? `<p class="error">${escapeHtml(
+          encourageError.message ||
+            "Could not load comments or reactions. Ask the captain to re-run schema.sql."
+        )}</p>`
+      : "") +
+    visible
+      .map((r) => {
+        let html = renderEntryCard(r, uid);
+        if (mark && !marked && r.kind === mark.kind && r.id === mark.id) {
+          marked = true;
+          html = html.replace('class="entry-row"', 'class="entry-row is-fresh"');
+        }
+        return html;
+      })
+      .join("");
 
   if (marked) {
-    const fresh = els.myEntries.querySelector(".entry-row.is-fresh");
+    const fresh = listEl.querySelector(".entry-row.is-fresh");
     fresh?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+}
+
+/**
+ * @param {"entry_comments"|"entry_reactions"} table
+ * @param {string[]} weighIds
+ * @param {string[]} exerciseIds
+ */
+async function fetchEncouragementRows(table, weighIds, exerciseIds) {
+  const select =
+    table === "entry_comments"
+      ? "id, author_id, weigh_in_id, exercise_log_id, body, created_at, updated_at"
+      : "id, user_id, weigh_in_id, exercise_log_id, emoji, created_at";
+
+  const queries = [];
+  if (weighIds.length) {
+    queries.push(
+      supabase.from(table).select(select).in("weigh_in_id", weighIds)
+    );
+  }
+  if (exerciseIds.length) {
+    queries.push(
+      supabase.from(table).select(select).in("exercise_log_id", exerciseIds)
+    );
+  }
+  if (!queries.length) return { rows: [], error: null };
+
+  const results = await Promise.all(queries);
+  const error = results.find((r) => r.error)?.error || null;
+  if (error) return { rows: [], error };
+  return { rows: results.flatMap((r) => r.data || []), error: null };
+}
+
+/** @param {Array<{ weigh_in_id?: string|null, exercise_log_id?: string|null }>} rows */
+function groupByEntryKey(rows) {
+  const map = new Map();
+  for (const row of rows) {
+    const key = entryKeyFromRow(row);
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(row);
+  }
+  for (const list of map.values()) {
+    list.sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  }
+  return map;
+}
+
+/**
+ * @param {{ kind: "weight"|"exercise", id: string, userId: string, detail: string, recordedOn: string }} entry
+ * @param {string} currentUserId
+ */
+function renderEntryCard(entry, currentUserId) {
+  const key = entryKey(entry.kind, entry.id);
+  const name = profileNameById.get(entry.userId) || "Family member";
+  const isSelf = entry.userId === currentUserId;
+  const who = isSelf
+    ? `${escapeHtml(name)} <span class="entry-who__you">(you)</span>`
+    : escapeHtml(name);
+  const badgeClass =
+    entry.kind === "weight" ? "entry-badge entry-badge--weight" : "entry-badge entry-badge--exercise";
+  const badgeLabel = entry.kind === "weight" ? "Weight" : "Exercise";
+
+  return `<article class="entry-row" data-kind="${escapeHtml(entry.kind)}" data-id="${escapeHtml(entry.id)}" data-entry-key="${escapeHtml(key)}">
+    <div class="entry-row__top">
+      <span class="${badgeClass}">${badgeLabel}</span>
+      <div class="entry-main">
+        <span class="entry-who">${who}</span>
+        <span class="entry-detail">${escapeHtml(entry.detail)}</span>
+        <span class="entry-meta">${escapeHtml(entry.recordedOn)}</span>
+      </div>
+    </div>
+    <div class="entry-encourage">
+      ${renderReactionRow(key, currentUserId)}
+      ${renderCommentBlock(key, currentUserId)}
+    </div>
+  </article>`;
+}
+
+function renderReactionRow(key, currentUserId) {
+  const chips = aggregateReactions(reactionsByEntry.get(key) || [], currentUserId);
+  return `<div class="reaction-row" role="group" aria-label="Reactions">
+    ${chips
+      .map((c) => {
+        const countHtml =
+          c.count > 0
+            ? `<span class="reaction-chip__count">${escapeHtml(String(c.count))}</span>`
+            : `<span class="reaction-chip__count" hidden>0</span>`;
+        const pressed = c.mine ? "true" : "false";
+        const mineClass = c.mine ? " is-mine" : "";
+        const label = c.mine
+          ? `Remove ${c.emoji} reaction`
+          : `Add ${c.emoji} reaction`;
+        return `<button type="button" class="reaction-chip${mineClass}" data-react-emoji="${escapeHtml(c.emoji)}" aria-pressed="${pressed}" aria-label="${escapeHtml(label)}"><span aria-hidden="true">${c.emoji}</span>${countHtml}</button>`;
+      })
+      .join("")}
+  </div>`;
+}
+
+function renderCommentBlock(key, currentUserId) {
+  const comments = commentsByEntry.get(key) || [];
+  let listHtml;
+  if (!comments.length) {
+    listHtml = `<p class="comment-list__empty">No notes yet — be the first to cheer them on.</p>`;
+  } else {
+    listHtml = `<ul class="comment-list">${comments
+      .map((c) => {
+        const author = profileNameById.get(c.author_id) || "Family member";
+        const mine = c.author_id === currentUserId;
+        const actions = mine
+          ? `<span class="comment-item__actions">
+              <button type="button" data-comment-edit="${escapeHtml(c.id)}">Edit</button>
+              <button type="button" data-comment-delete="${escapeHtml(c.id)}">Delete</button>
+            </span>`
+          : "";
+        return `<li class="comment-item" data-comment-id="${escapeHtml(c.id)}">
+          <div class="comment-item__head">
+            <span class="comment-item__author">${escapeHtml(author)}</span>
+            ${actions}
+          </div>
+          <p class="comment-item__body">${escapeHtml(c.body)}</p>
+        </li>`;
+      })
+      .join("")}</ul>`;
+  }
+
+  return `${listHtml}
+    <form class="comment-form" data-comment-form>
+      <div class="comment-form__row">
+        <input type="text" name="body" maxlength="${COMMENT_MAX_LENGTH}" placeholder="Short encouragement…" enterkeyhint="send" autocomplete="off" aria-label="Encouragement comment">
+        <button type="submit" class="comment-form__submit">Post</button>
+      </div>
+      <p class="comment-form__hint">Up to ${COMMENT_MAX_LENGTH} characters.</p>
+    </form>`;
+}
+
+async function toggleReaction(kind, entryId, emoji) {
+  const key = entryKey(kind, entryId);
+  const busy = `${key}:${emoji}`;
+  if (reactionBusyKey === busy) return;
+  reactionBusyKey = busy;
+  const uid = session.user.id;
+  const rows = reactionsByEntry.get(key) || [];
+  const existingId = findOwnReactionId(rows, emoji, uid);
+  try {
+    if (existingId) {
+      const { error } = await supabase.from("entry_reactions").delete().eq("id", existingId);
+      if (error) {
+        showStatus(error.message, "error");
+        return;
+      }
+      reactionsByEntry.set(
+        key,
+        rows.filter((r) => r.id !== existingId)
+      );
+    } else {
+      if (!REACTION_EMOJIS.includes(emoji)) {
+        showStatus("That reaction isn’t available.", "error");
+        return;
+      }
+      const target = entryTargetColumns(kind, entryId);
+      if (!target) return;
+      const payload = { user_id: uid, emoji, ...target };
+      const { data, error } = await supabase
+        .from("entry_reactions")
+        .insert(payload)
+        .select("id, user_id, weigh_in_id, exercise_log_id, emoji, created_at")
+        .single();
+      if (error) {
+        showStatus(error.message, "error");
+        return;
+      }
+      reactionsByEntry.set(key, [...rows, data]);
+    }
+    refreshEntryEncourageUi(key);
+  } finally {
+    reactionBusyKey = null;
+  }
+}
+
+async function submitComment(kind, entryId, rawBody, form) {
+  const normalized = normalizeCommentBody(rawBody);
+  if (!normalized.ok) {
+    showStatus(normalized.message, "error");
+    return;
+  }
+  const target = entryTargetColumns(kind, entryId);
+  if (!target) return;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    const { data, error } = await supabase
+      .from("entry_comments")
+      .insert({
+        author_id: session.user.id,
+        body: normalized.body,
+        ...target,
+      })
+      .select("id, author_id, weigh_in_id, exercise_log_id, body, created_at, updated_at")
+      .single();
+    if (error) {
+      showStatus(error.message, "error");
+      return;
+    }
+    const key = entryKey(kind, entryId);
+    const list = commentsByEntry.get(key) || [];
+    commentsByEntry.set(key, [...list, data]);
+    form.reset();
+    refreshEntryEncourageUi(key);
+    showStatus("Encouragement posted.", "success");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function editComment(commentId) {
+  const key = [...commentsByEntry.keys()].find((k) =>
+    (commentsByEntry.get(k) || []).some((c) => c.id === commentId)
+  );
+  if (!key) return;
+  const comment = (commentsByEntry.get(key) || []).find((c) => c.id === commentId);
+  if (!comment || comment.author_id !== session.user.id) return;
+  const next = window.prompt("Edit your note", comment.body);
+  if (next == null) return;
+  const normalized = normalizeCommentBody(next);
+  if (!normalized.ok) {
+    showStatus(normalized.message, "error");
+    return;
+  }
+  const { data, error } = await supabase
+    .from("entry_comments")
+    .update({ body: normalized.body, updated_at: new Date().toISOString() })
+    .eq("id", commentId)
+    .select("id, author_id, weigh_in_id, exercise_log_id, body, created_at, updated_at")
+    .single();
+  if (error) {
+    showStatus(error.message, "error");
+    return;
+  }
+  commentsByEntry.set(
+    key,
+    (commentsByEntry.get(key) || []).map((c) => (c.id === commentId ? data : c))
+  );
+  refreshEntryEncourageUi(key);
+  showStatus("Note updated.", "success");
+}
+
+async function deleteComment(commentId) {
+  const key = [...commentsByEntry.keys()].find((k) =>
+    (commentsByEntry.get(k) || []).some((c) => c.id === commentId)
+  );
+  if (!key) return;
+  const comment = (commentsByEntry.get(key) || []).find((c) => c.id === commentId);
+  if (!comment || comment.author_id !== session.user.id) return;
+  if (!window.confirm("Delete this note?")) return;
+  const { error } = await supabase.from("entry_comments").delete().eq("id", commentId);
+  if (error) {
+    showStatus(error.message, "error");
+    return;
+  }
+  commentsByEntry.set(
+    key,
+    (commentsByEntry.get(key) || []).filter((c) => c.id !== commentId)
+  );
+  refreshEntryEncourageUi(key);
+  showStatus("Note deleted.", "success");
+}
+
+function refreshEntryEncourageUi(key) {
+  const card = els.recentEntries?.querySelector(`[data-entry-key="${cssEscapeAttr(key)}"]`);
+  if (!card) return;
+  const block = card.querySelector(".entry-encourage");
+  if (!block) return;
+  const uid = session.user.id;
+  block.innerHTML = `${renderReactionRow(key, uid)}${renderCommentBlock(key, uid)}`;
+}
+
+function cssEscapeAttr(value) {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
+  }
+  return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function escapeHtml(str) {
@@ -1016,7 +1341,7 @@ function escapeHtml(str) {
 
 async function refreshAppData() {
   const avatarRevAtStart = avatarRevision;
-  await Promise.all([loadProfile(), loadBoard(), loadMyEntries()]);
+  await Promise.all([loadProfile(), loadBoard(), loadRecentEntries()]);
   if (avatarRevAtStart === avatarRevision) {
     reconcileMyAvatarPathFromBoard();
   }
@@ -1165,10 +1490,49 @@ function wireForms() {
   els.leaderboard.addEventListener("error", handleBoardAvatarError, true);
 
   els.app.addEventListener("click", (ev) => {
-    const btn = ev.target.closest("[data-open-log]");
-    if (!btn || !els.app.contains(btn)) return;
-    const mode = btn.getAttribute("data-open-log");
-    if (mode === "weight" || mode === "exercise") setLogMode(mode);
+    const openLogBtn = ev.target.closest("[data-open-log]");
+    if (openLogBtn && els.app.contains(openLogBtn)) {
+      const mode = openLogBtn.getAttribute("data-open-log");
+      if (mode === "weight" || mode === "exercise") setLogMode(mode);
+      return;
+    }
+
+    const reactBtn = ev.target.closest("[data-react-emoji]");
+    if (reactBtn && els.app.contains(reactBtn)) {
+      const card = reactBtn.closest(".entry-row");
+      const kind = card?.getAttribute("data-kind");
+      const id = card?.getAttribute("data-id");
+      const emoji = reactBtn.getAttribute("data-react-emoji");
+      if ((kind === "weight" || kind === "exercise") && id && emoji) {
+        toggleReaction(kind, id, emoji);
+      }
+      return;
+    }
+
+    const editBtn = ev.target.closest("[data-comment-edit]");
+    if (editBtn && els.app.contains(editBtn)) {
+      const commentId = editBtn.getAttribute("data-comment-edit");
+      if (commentId) editComment(commentId);
+      return;
+    }
+
+    const deleteBtn = ev.target.closest("[data-comment-delete]");
+    if (deleteBtn && els.app.contains(deleteBtn)) {
+      const commentId = deleteBtn.getAttribute("data-comment-delete");
+      if (commentId) deleteComment(commentId);
+    }
+  });
+
+  els.app.addEventListener("submit", (ev) => {
+    const form = ev.target.closest("[data-comment-form]");
+    if (!form || !els.app.contains(form)) return;
+    ev.preventDefault();
+    const card = form.closest(".entry-row");
+    const kind = card?.getAttribute("data-kind");
+    const id = card?.getAttribute("data-id");
+    if ((kind !== "weight" && kind !== "exercise") || !id) return;
+    const body = String(new FormData(form).get("body") || "");
+    submitComment(kind, id, body, form);
   });
 
   els.profileForm.addEventListener("submit", async (ev) => {

@@ -57,6 +57,73 @@ create index if not exists exercise_logs_user_id_recorded_on_idx
 comment on table public.exercise_logs is 'Exercise sessions; readable by signed-in family for competition.';
 
 -- ---------------------------------------------------------------------------
+-- Entry encouragement (comments + reactions on weigh-ins / exercise logs)
+-- ---------------------------------------------------------------------------
+create table if not exists public.entry_comments (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.profiles (id) on delete cascade,
+  weigh_in_id uuid references public.weigh_ins (id) on delete cascade,
+  exercise_log_id uuid references public.exercise_logs (id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint entry_comments_one_target check (
+    (weigh_in_id is not null and exercise_log_id is null)
+    or (weigh_in_id is null and exercise_log_id is not null)
+  ),
+  constraint entry_comments_body_len check (
+    char_length(trim(body)) >= 1
+    and char_length(body) <= 280
+  )
+);
+
+create index if not exists entry_comments_weigh_in_id_idx
+  on public.entry_comments (weigh_in_id, created_at)
+  where weigh_in_id is not null;
+
+create index if not exists entry_comments_exercise_log_id_idx
+  on public.entry_comments (exercise_log_id, created_at)
+  where exercise_log_id is not null;
+
+comment on table public.entry_comments is
+  'Short encouragement comments on family weigh-ins or exercise logs.';
+
+create table if not exists public.entry_reactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  weigh_in_id uuid references public.weigh_ins (id) on delete cascade,
+  exercise_log_id uuid references public.exercise_logs (id) on delete cascade,
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  constraint entry_reactions_one_target check (
+    (weigh_in_id is not null and exercise_log_id is null)
+    or (weigh_in_id is null and exercise_log_id is not null)
+  ),
+  constraint entry_reactions_emoji_allowed check (
+    emoji in ('👍', '❤️', '🎉', '💪', '🔥')
+  )
+);
+
+create unique index if not exists entry_reactions_weigh_unique
+  on public.entry_reactions (user_id, emoji, weigh_in_id)
+  where weigh_in_id is not null;
+
+create unique index if not exists entry_reactions_exercise_unique
+  on public.entry_reactions (user_id, emoji, exercise_log_id)
+  where exercise_log_id is not null;
+
+create index if not exists entry_reactions_weigh_in_id_idx
+  on public.entry_reactions (weigh_in_id)
+  where weigh_in_id is not null;
+
+create index if not exists entry_reactions_exercise_log_id_idx
+  on public.entry_reactions (exercise_log_id)
+  where exercise_log_id is not null;
+
+comment on table public.entry_reactions is
+  'Emoji reactions on family weigh-ins or exercise logs; one emoji per member per entry.';
+
+-- ---------------------------------------------------------------------------
 -- Auto-create profile on sign-up / first auth user insert
 -- ---------------------------------------------------------------------------
 create or replace function public.handle_new_user()
@@ -103,6 +170,8 @@ on conflict (id) do nothing;
 alter table public.profiles enable row level security;
 alter table public.weigh_ins enable row level security;
 alter table public.exercise_logs enable row level security;
+alter table public.entry_comments enable row level security;
+alter table public.entry_reactions enable row level security;
 
 -- Profiles: signed-in family can read everyone; only update own row
 drop policy if exists "profiles_select_authenticated" on public.profiles;
@@ -175,6 +244,51 @@ create policy "exercise_logs_update_own"
 drop policy if exists "exercise_logs_delete_own" on public.exercise_logs;
 create policy "exercise_logs_delete_own"
   on public.exercise_logs for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- Entry comments: family can read; each member writes/edits/deletes only their own
+drop policy if exists "entry_comments_select_authenticated" on public.entry_comments;
+create policy "entry_comments_select_authenticated"
+  on public.entry_comments for select
+  to authenticated
+  using (true);
+
+drop policy if exists "entry_comments_insert_own" on public.entry_comments;
+create policy "entry_comments_insert_own"
+  on public.entry_comments for insert
+  to authenticated
+  with check (auth.uid() = author_id);
+
+drop policy if exists "entry_comments_update_own" on public.entry_comments;
+create policy "entry_comments_update_own"
+  on public.entry_comments for update
+  to authenticated
+  using (auth.uid() = author_id)
+  with check (auth.uid() = author_id);
+
+drop policy if exists "entry_comments_delete_own" on public.entry_comments;
+create policy "entry_comments_delete_own"
+  on public.entry_comments for delete
+  to authenticated
+  using (auth.uid() = author_id);
+
+-- Entry reactions: family can read; each member adds/removes only their own (no impersonation)
+drop policy if exists "entry_reactions_select_authenticated" on public.entry_reactions;
+create policy "entry_reactions_select_authenticated"
+  on public.entry_reactions for select
+  to authenticated
+  using (true);
+
+drop policy if exists "entry_reactions_insert_own" on public.entry_reactions;
+create policy "entry_reactions_insert_own"
+  on public.entry_reactions for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "entry_reactions_delete_own" on public.entry_reactions;
+create policy "entry_reactions_delete_own"
+  on public.entry_reactions for delete
   to authenticated
   using (auth.uid() = user_id);
 

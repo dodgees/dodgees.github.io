@@ -1135,13 +1135,19 @@ body.has-log-dock .toast {
 
 .entry-row {
   display: flex;
-  align-items: flex-start;
-  gap: 0.65rem 0.75rem;
+  flex-direction: column;
+  gap: 0.65rem;
   font-size: 0.9rem;
   padding: 0.75rem 0.85rem;
   background: var(--panel);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-sm);
+}
+
+.entry-row__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem 0.75rem;
 }
 
 .entry-row.is-fresh {
@@ -1189,9 +1195,19 @@ body.has-log-dock .toast {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.75rem 1rem;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.entry-who {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.entry-who__you {
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .entry-detail {
@@ -1204,7 +1220,182 @@ body.has-log-dock .toast {
   white-space: nowrap;
   font-size: 0.8125rem;
   flex-shrink: 0;
-  padding-top: 0.1rem;
+}
+
+.entry-encourage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid var(--divider);
+}
+
+.reaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.reaction-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 2.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--panel-edge);
+  background: var(--bg-deep);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reaction-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--panel-edge));
+}
+
+.reaction-chip.is-mine {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-edge));
+}
+
+.reaction-chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.reaction-chip__count {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 0.75rem;
+}
+
+.reaction-chip.is-mine .reaction-chip__count {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.comment-list__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.comment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.comment-item__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+}
+
+.comment-item__author {
+  font-weight: 600;
+}
+
+.comment-item__actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.comment-item__actions button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.2rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.comment-item__actions button:hover {
+  color: var(--text);
+}
+
+.comment-item__body {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.comment-form__row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.comment-form input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--touch);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.comment-form input[type="text"]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.comment-form__submit {
+  flex: 0 0 auto;
+  min-height: var(--touch);
+  min-width: var(--touch);
+  padding: 0 0.85rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.comment-form__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.comment-form__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 code {
