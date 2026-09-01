@@ -8,8 +8,10 @@ import {
 import {
   boardMemberAccessibleName,
   competitionSinceDay,
+  isMissingAvatarPathError,
   localDateISO,
   loadBoardErrorShouldKeepBoard,
+  missingAvatarPathOperatorMessage,
   personalProgressFromSummary,
   personalProgressUnavailable,
   profileUpdateStatus,
@@ -88,6 +90,11 @@ const AVATAR_SIGNED_URL_TTL_SEC = 3600;
 const AVATAR_SIGNED_URL_REFRESH_MS = (AVATAR_SIGNED_URL_TTL_SEC - 600) * 1000;
 /** @type {ReturnType<typeof setTimeout> | null} */
 let avatarUrlRefreshTimer = null;
+/**
+ * Whether profiles.avatar_path exists in production.
+ * null = unknown; false = missing (degrade to initials); true = OK.
+ */
+let avatarPathColumnOk = null;
 
 function clearAvatarUrlRefresh() {
   clearTimeout(avatarUrlRefreshTimer);
@@ -151,9 +158,18 @@ function setAuthError(msg) {
   els.authError.textContent = msg || "";
 }
 
-function setBoardError(msg) {
+function setBoardError(msg, { soft = false } = {}) {
   els.boardError.hidden = !msg;
   els.boardError.textContent = msg || "";
+  els.boardError.classList.toggle("error", Boolean(msg) && !soft);
+  els.boardError.classList.toggle("hint", Boolean(msg) && soft);
+  els.boardError.setAttribute("role", soft ? "status" : "alert");
+}
+
+function noteMissingAvatarPathColumn() {
+  avatarPathColumnOk = false;
+  myAvatarPath = null;
+  setBoardError(missingAvatarPathOperatorMessage(), { soft: true });
 }
 
 function seedDates() {
@@ -304,6 +320,9 @@ async function resolveAvatarUrls(paths, { retainPaths = false } = {}) {
 
 async function uploadAvatar(file) {
   setAvatarError("");
+  if (avatarPathColumnOk === false) {
+    throw new Error(missingAvatarPathOperatorMessage());
+  }
   const prepared = await prepareAvatarFile(file);
   const path = avatarObjectPath(session.user.id, prepared.ext);
   const { error: uploadError } = await supabase.storage
@@ -320,8 +339,13 @@ async function uploadAvatar(file) {
     .update({ avatar_path: path })
     .eq("id", session.user.id)
     .select("id, avatar_path");
+  if (isMissingAvatarPathError(error)) {
+    noteMissingAvatarPathColumn();
+    throw new Error(missingAvatarPathOperatorMessage());
+  }
   const result = profileUpdateStatus(data, error);
   if (!result.ok) throw new Error(result.message);
+  avatarPathColumnOk = true;
 
   avatarRevision += 1;
   myAvatarPath = path;
@@ -339,6 +363,9 @@ async function uploadAvatar(file) {
 async function removeAvatar() {
   setAvatarError("");
   if (!myAvatarPath) return;
+  if (avatarPathColumnOk === false) {
+    throw new Error(missingAvatarPathOperatorMessage());
+  }
 
   const oldPath = myAvatarPath;
   const { data, error } = await supabase
@@ -346,6 +373,10 @@ async function removeAvatar() {
     .update({ avatar_path: null })
     .eq("id", session.user.id)
     .select("id");
+  if (isMissingAvatarPathError(error)) {
+    noteMissingAvatarPathColumn();
+    throw new Error(missingAvatarPathOperatorMessage());
+  }
   const result = profileUpdateStatus(data, error);
   if (!result.ok) throw new Error(result.message);
 
@@ -420,6 +451,7 @@ function renderSignedOut() {
   myAvatarPath = null;
   myDisplayName = "";
   avatarRevision = 0;
+  avatarPathColumnOk = null;
   loadBoardGeneration = 0;
   loadBoardRenderedGeneration = 0;
   lastRenderedBoardMembers = null;
@@ -443,18 +475,40 @@ function renderSignedIn(user) {
   seedDates();
 }
 
-async function loadProfile() {
-  const avatarRevAtStart = avatarRevision;
-  const { data, error } = await supabase
+async function fetchOwnProfile(includeAvatarPath) {
+  const cols = includeAvatarPath
+    ? "display_name, avatar_path"
+    : "display_name";
+  return supabase
     .from("profiles")
-    .select("display_name, avatar_path")
+    .select(cols)
     .eq("id", session.user.id)
     .maybeSingle();
+}
+
+async function fetchProfiles(includeAvatarPath) {
+  const cols = includeAvatarPath
+    ? "id, display_name, avatar_path"
+    : "id, display_name";
+  return supabase.from("profiles").select(cols).order("display_name");
+}
+
+async function loadProfile() {
+  const avatarRevAtStart = avatarRevision;
+  const wantAvatar = avatarPathColumnOk !== false;
+  let { data, error } = await fetchOwnProfile(wantAvatar);
+  if (isMissingAvatarPathError(error)) {
+    noteMissingAvatarPathColumn();
+    ({ data, error } = await fetchOwnProfile(false));
+  } else if (!error && wantAvatar) {
+    avatarPathColumnOk = true;
+  }
   if (error) throw error;
   const name = data?.display_name || "";
   myDisplayName = name;
   if (avatarRevAtStart === avatarRevision) {
-    myAvatarPath = data?.avatar_path || null;
+    myAvatarPath =
+      avatarPathColumnOk === false ? null : data?.avatar_path || null;
   }
   els.profileForm.display_name.value = name;
   if (name) {
@@ -644,7 +698,11 @@ function commitLoadBoardRender(generation) {
   lastRenderedBoardMembers = boardMembers
     ? boardMembers.map((m) => ({ ...m }))
     : boardMembers;
-  setBoardError("");
+  if (avatarPathColumnOk === false) {
+    setBoardError(missingAvatarPathOperatorMessage(), { soft: true });
+  } else {
+    setBoardError("");
+  }
 }
 
 function syncPersonalProgressFromBoard() {
@@ -671,9 +729,10 @@ async function loadBoard() {
   boardMembers = null;
 
   const sinceDay = competitionSinceDay();
+  const wantAvatar = avatarPathColumnOk !== false;
 
-  const [profilesRes, weighRes, exerciseRes] = await Promise.all([
-    supabase.from("profiles").select("id, display_name, avatar_path").order("display_name"),
+  const [profilesRes0, weighRes, exerciseRes] = await Promise.all([
+    fetchProfiles(wantAvatar),
     supabase
       .from("weigh_ins")
       .select("user_id, weight_lbs, recorded_on, created_at")
@@ -685,6 +744,16 @@ async function loadBoard() {
       .select("user_id, duration_minutes, recorded_on, activity")
       .gte("recorded_on", sinceDay),
   ]);
+
+  let profilesRes = profilesRes0;
+  let missingAvatarColumn = false;
+  if (isMissingAvatarPathError(profilesRes.error)) {
+    missingAvatarColumn = true;
+    noteMissingAvatarPathColumn();
+    profilesRes = await fetchProfiles(false);
+  } else if (!profilesRes.error && wantAvatar) {
+    avatarPathColumnOk = true;
+  }
 
   if (profilesRes.error || weighRes.error || exerciseRes.error) {
     if (loadBoardResultIsStale(generation)) return true;
@@ -709,10 +778,18 @@ async function loadBoard() {
     }
     if (boardMembers !== null) return true;
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
-    setBoardError(err.message);
+    setBoardError(
+      isMissingAvatarPathError(err)
+        ? missingAvatarPathOperatorMessage()
+        : err.message
+    );
     els.leaderboard.innerHTML = "";
     renderPersonalProgress(personalProgressUnavailable());
     return false;
+  }
+
+  if (missingAvatarColumn || avatarPathColumnOk === false) {
+    setBoardError(missingAvatarPathOperatorMessage(), { soft: true });
   }
 
   const profiles = profilesRes.data || [];
@@ -726,7 +803,10 @@ async function loadBoard() {
   }
 
   if (loadBoardResultIsStale(generation)) return true;
-  const avatarPaths = profiles.map((p) => p.avatar_path);
+  const avatarPaths =
+    avatarPathColumnOk === false
+      ? []
+      : profiles.map((p) => p.avatar_path);
   if (myAvatarPath && !avatarPaths.includes(myAvatarPath)) {
     avatarPaths.push(myAvatarPath);
   }
@@ -751,7 +831,8 @@ async function loadBoard() {
     const series = weighByUser.get(p.id) || [];
     const weight = weightSummaryFromSeries(series);
     const mins = minutesByUser.get(p.id) || 0;
-    const avatarPath = p.avatar_path || null;
+    const avatarPath =
+      avatarPathColumnOk === false ? null : p.avatar_path || null;
     return {
       id: p.id,
       name: p.display_name || "Family member",
@@ -892,7 +973,11 @@ async function onSession(next) {
   try {
     await refreshAppData();
   } catch (err) {
-    setBoardError(err.message || String(err));
+    if (isMissingAvatarPathError(err)) {
+      noteMissingAvatarPathColumn();
+    } else {
+      setBoardError(err.message || String(err));
+    }
   }
 }
 

@@ -1,6 +1,9 @@
 -- Family Fit — Supabase schema + RLS
 -- Paste into the Supabase SQL editor (Dashboard → SQL → New query).
 -- Run once on a fresh project. Safe to re-run: uses IF NOT EXISTS / DROP POLICY IF EXISTS.
+--
+-- LIVE ERROR "column profiles.avatar_path does not exist"?
+--   Do not re-run this whole file first — paste migrate-avatar-path.sql instead (one-shot).
 
 -- ---------------------------------------------------------------------------
 -- Profiles (one row per invited family member)

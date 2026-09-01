@@ -2,6 +2,16 @@
 
 Invite-only family weight-loss / healthy-living competition mini-app, served as a static sub-app at `/family-fit/` on this GitHub Pages site. Auth and data live in Supabase (Postgres + Auth). The frontend is vanilla HTML/CSS/JS — no build step.
 
+> ### If you see `column profiles.avatar_path does not exist`
+>
+> Production was never migrated after profile photos shipped. **Do not dig through the full schema** — run this one-shot fix:
+>
+> 1. Open Supabase → **SQL → New query**
+> 2. Paste **[`migrate-avatar-path.sql`](./migrate-avatar-path.sql)** and **Run**
+> 3. Refresh `/family-fit/` — avatars work again; weigh-ins/board keep working either way
+>
+> That file only adds `profiles.avatar_path`, refreshes the profile update policy, and ensures the private `avatars` Storage bucket + policies exist. Safe to re-run.
+
 ## Captain setup (one-time)
 
 ### 1. Create a Supabase project

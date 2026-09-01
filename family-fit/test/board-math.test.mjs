@@ -4,7 +4,9 @@ import {
   boardMemberAccessibleName,
   competitionSinceDay,
   formatWeightDelta,
+  isMissingAvatarPathError,
   localDateISO,
+  missingAvatarPathOperatorMessage,
   profileUpdateStatus,
   readBoardSortPreference,
   sortBoardMembers,
@@ -208,6 +210,47 @@ describe("profileUpdateStatus (zero-row is failure)", () => {
     const res = profileUpdateStatus([{ id: "abc" }], null);
     assert.equal(res.ok, true);
     assert.equal(res.message, "Display name saved.");
+  });
+
+  it("rewrites missing avatar_path errors to the captain SQL message", () => {
+    const res = profileUpdateStatus(null, {
+      code: "42703",
+      message: "column profiles.avatar_path does not exist",
+    });
+    assert.equal(res.ok, false);
+    assert.match(res.message, /migrate-avatar-path\.sql/);
+    assert.match(res.message, /Weigh-ins, exercise, and the board still work/i);
+    assert.equal(res.message, missingAvatarPathOperatorMessage());
+  });
+});
+
+describe("isMissingAvatarPathError", () => {
+  it("detects Postgres undefined_column and PostgREST schema-cache misses", () => {
+    assert.equal(
+      isMissingAvatarPathError({
+        code: "42703",
+        message: 'column "avatar_path" of relation "profiles" does not exist',
+      }),
+      true
+    );
+    assert.equal(
+      isMissingAvatarPathError({
+        code: "PGRST204",
+        message: "Could not find the 'avatar_path' column of 'profiles' in the schema cache",
+      }),
+      true
+    );
+    assert.equal(
+      isMissingAvatarPathError({
+        message: "column profiles.avatar_path does not exist",
+      }),
+      true
+    );
+    assert.equal(
+      isMissingAvatarPathError({ message: "permission denied for table profiles" }),
+      false
+    );
+    assert.match(missingAvatarPathOperatorMessage(), /migrate-avatar-path\.sql/);
   });
 });
 
