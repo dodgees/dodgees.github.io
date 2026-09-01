@@ -135,7 +135,7 @@ Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for 
 - **weigh_ins** — `user_id`, `weight_lbs`, `recorded_on`, optional `note`
 - **exercise_logs** — `user_id`, `activity`, `duration_minutes`, `recorded_on`, optional `note`
 - **entry_comments** — short encouragement on a weigh-in or exercise log (`weigh_in_id` xor `exercise_log_id`); author can write/edit/delete own; family can read
-- **entry_reactions** — one of 👍 ❤️ 🎉 💪 🔥 per member per entry; owner can add/remove; family can read counts
+- **entry_reactions** — allowed emojis 👍 ❤️ 🎉 💪 🔥, at most one of each per member per entry; owner can add/remove; family can read counts
 
 Full DDL + RLS: [`schema.sql`](./schema.sql).
 
@@ -148,7 +148,7 @@ If Family Fit was set up before comments/reactions shipped, re-run the full [`sc
 3. Allowed reaction emojis match the check constraint: `👍`, `❤️`, `🎉`, `💪`, `🔥`.
 4. Comment body length is 1–280 characters (trimmed non-empty).
 
-Until that SQL runs, the app’s recent-entries encouragement UI will show API errors instead of comments/reactions.
+Until that SQL runs, recent entries show a load-error banner and “Encouragement unavailable right now” on each card instead of comment/reaction controls.
 
 ## Security notes
 

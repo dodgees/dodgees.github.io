@@ -121,7 +121,7 @@ create index if not exists entry_reactions_exercise_log_id_idx
   where exercise_log_id is not null;
 
 comment on table public.entry_reactions is
-  'Emoji reactions on family weigh-ins or exercise logs; one emoji per member per entry.';
+  'Emoji reactions on family weigh-ins or exercise logs; one row per member, emoji, and entry.';
 
 -- ---------------------------------------------------------------------------
 -- Auto-create profile on sign-up / first auth user insert
