@@ -102,3 +102,21 @@ export function findOwnReactionId(rows, emoji, currentUserId) {
   );
   return hit?.id || null;
 }
+
+/**
+ * @param {Array<{ id: string }>} rows
+ * @param {string} deletedId
+ */
+export function mergeReactionAfterDelete(rows, deletedId) {
+  return (rows || []).filter((r) => r.id !== deletedId);
+}
+
+/**
+ * @param {Array<{ id: string }>} rows
+ * @param {{ id: string }} row
+ */
+export function mergeReactionAfterInsert(rows, row) {
+  const current = rows || [];
+  if (current.some((r) => r.id === row.id)) return current;
+  return [...current, row];
+}

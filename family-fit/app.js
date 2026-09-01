@@ -28,6 +28,8 @@ import {
   entryKeyFromRow,
   entryTargetColumns,
   findOwnReactionId,
+  mergeReactionAfterDelete,
+  mergeReactionAfterInsert,
   normalizeCommentBody,
 } from "./encouragement.js";
 
@@ -105,6 +107,8 @@ let lastRenderedBoardMembers = null;
 let reactionsByEntry = new Map();
 /** Map entryKey → comment rows for the visible feed. */
 let commentsByEntry = new Map();
+/** False when encouragement fetch failed; blocks stale empty-cache UI and mutations. */
+let encouragementLoaded = false;
 /** Map profile id → display_name for feed authors. */
 let profileNameById = new Map();
 /** Prevent double-submit on reaction taps. */
@@ -1004,6 +1008,7 @@ async function loadRecentEntries() {
   if (!visible.length) {
     reactionsByEntry = new Map();
     commentsByEntry = new Map();
+    encouragementLoaded = false;
     listEl.innerHTML = emptyStateHtml({
       title: "No entries yet",
       body: "Family weigh-ins and workouts will show up here. Log one to get started — then cheer each other on.",
@@ -1021,10 +1026,14 @@ async function loadRecentEntries() {
     fetchEncouragementRows("entry_reactions", weighIds, exerciseIds),
   ]);
 
-  commentsByEntry = groupByEntryKey(commentsRes.rows || []);
-  reactionsByEntry = groupByEntryKey(reactionsRes.rows || []);
-
   const encourageError = commentsRes.error || reactionsRes.error;
+  if (encourageError) {
+    encouragementLoaded = false;
+  } else {
+    commentsByEntry = groupByEntryKey(commentsRes.rows || []);
+    reactionsByEntry = groupByEntryKey(reactionsRes.rows || []);
+    encouragementLoaded = true;
+  }
   let marked = false;
   listEl.innerHTML =
     (encourageError
@@ -1120,10 +1129,16 @@ function renderEntryCard(entry, currentUserId) {
       </div>
     </div>
     <div class="entry-encourage">
-      ${renderReactionRow(key, currentUserId)}
-      ${renderCommentBlock(key, currentUserId)}
+      ${renderEncourageBlock(key, currentUserId)}
     </div>
   </article>`;
+}
+
+function renderEncourageBlock(key, currentUserId) {
+  if (!encouragementLoaded) {
+    return '<p class="muted">Encouragement unavailable right now.</p>';
+  }
+  return `${renderReactionRow(key, currentUserId)}${renderCommentBlock(key, currentUserId)}`;
 }
 
 function renderReactionRow(key, currentUserId) {
@@ -1184,6 +1199,10 @@ function renderCommentBlock(key, currentUserId) {
 }
 
 async function toggleReaction(kind, entryId, emoji) {
+  if (!encouragementLoaded) {
+    showStatus("Comments and reactions aren’t available yet.", "error");
+    return;
+  }
   const key = entryKey(kind, entryId);
   const busy = `${key}:${emoji}`;
   if (reactionBusyKey === busy) return;
@@ -1200,7 +1219,7 @@ async function toggleReaction(kind, entryId, emoji) {
       }
       reactionsByEntry.set(
         key,
-        rows.filter((r) => r.id !== existingId)
+        mergeReactionAfterDelete(reactionsByEntry.get(key), existingId)
       );
     } else {
       if (!REACTION_EMOJIS.includes(emoji)) {
@@ -1219,7 +1238,10 @@ async function toggleReaction(kind, entryId, emoji) {
         showStatus(error.message, "error");
         return;
       }
-      reactionsByEntry.set(key, [...rows, data]);
+      reactionsByEntry.set(
+        key,
+        mergeReactionAfterInsert(reactionsByEntry.get(key), data)
+      );
     }
     refreshEntryEncourageUi(key);
   } finally {
@@ -1228,6 +1250,10 @@ async function toggleReaction(kind, entryId, emoji) {
 }
 
 async function submitComment(kind, entryId, rawBody, form) {
+  if (!encouragementLoaded) {
+    showStatus("Comments and reactions aren’t available yet.", "error");
+    return;
+  }
   const normalized = normalizeCommentBody(rawBody);
   if (!normalized.ok) {
     showStatus(normalized.message, "error");
@@ -1263,6 +1289,10 @@ async function submitComment(kind, entryId, rawBody, form) {
 }
 
 async function editComment(commentId) {
+  if (!encouragementLoaded) {
+    showStatus("Comments and reactions aren’t available yet.", "error");
+    return;
+  }
   const key = [...commentsByEntry.keys()].find((k) =>
     (commentsByEntry.get(k) || []).some((c) => c.id === commentId)
   );
@@ -1295,6 +1325,10 @@ async function editComment(commentId) {
 }
 
 async function deleteComment(commentId) {
+  if (!encouragementLoaded) {
+    showStatus("Comments and reactions aren’t available yet.", "error");
+    return;
+  }
   const key = [...commentsByEntry.keys()].find((k) =>
     (commentsByEntry.get(k) || []).some((c) => c.id === commentId)
   );
@@ -1321,7 +1355,7 @@ function refreshEntryEncourageUi(key) {
   const block = card.querySelector(".entry-encourage");
   if (!block) return;
   const uid = session.user.id;
-  block.innerHTML = `${renderReactionRow(key, uid)}${renderCommentBlock(key, uid)}`;
+  block.innerHTML = renderEncourageBlock(key, uid);
 }
 
 function cssEscapeAttr(value) {

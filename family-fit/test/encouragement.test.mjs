@@ -8,6 +8,8 @@ import {
   entryKeyFromRow,
   entryTargetColumns,
   findOwnReactionId,
+  mergeReactionAfterDelete,
+  mergeReactionAfterInsert,
   normalizeCommentBody,
 } from "../encouragement.js";
 
@@ -91,5 +93,34 @@ describe("findOwnReactionId", () => {
     ];
     assert.equal(findOwnReactionId(rows, "👍", "me"), "a");
     assert.equal(findOwnReactionId(rows, "❤️", "me"), null);
+  });
+});
+
+describe("reaction cache merge", () => {
+  it("insert merges onto current rows, not a stale snapshot", () => {
+    const stale = [{ id: "1", emoji: "👍", user_id: "u1" }];
+    const current = [...stale, { id: "2", emoji: "❤️", user_id: "u1" }];
+    const merged = mergeReactionAfterInsert(current, {
+      id: "3",
+      emoji: "🎉",
+      user_id: "u1",
+    });
+    assert.equal(merged.length, 3);
+    assert.deepEqual(
+      merged.map((r) => r.id),
+      ["1", "2", "3"]
+    );
+  });
+
+  it("delete merges onto current rows", () => {
+    const current = [
+      { id: "1", emoji: "👍", user_id: "u1" },
+      { id: "2", emoji: "❤️", user_id: "u1" },
+    ];
+    const merged = mergeReactionAfterDelete(current, "1");
+    assert.deepEqual(
+      merged.map((r) => r.id),
+      ["2"]
+    );
   });
 });
