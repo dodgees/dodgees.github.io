@@ -13,6 +13,7 @@ import {
   weightSummaryFromSeries,
   writeBoardSortPreference,
   loadBoardErrorShouldKeepBoard,
+  personalProgressFromLogs,
   BOARD_SORT_STORAGE_KEY,
 } from "../board-math.js";
 
@@ -206,6 +207,82 @@ describe("profileUpdateStatus (zero-row is failure)", () => {
     const res = profileUpdateStatus([{ id: "abc" }], null);
     assert.equal(res.ok, true);
     assert.equal(res.message, "Display name saved.");
+  });
+});
+
+describe("personalProgressFromLogs", () => {
+  it("shows empty CTA state with no weigh-ins and sums exercise", () => {
+    const progress = personalProgressFromLogs([], 45);
+    assert.equal(progress.kind, "empty");
+    assert.equal(progress.exerciseMinutes, 45);
+    assert.equal(progress.exerciseLabel, "45 minutes");
+    assert.equal(progress.cta?.logMode, "weight");
+    assert.match(progress.emptyTitle, /progress/i);
+    assert.equal(progress.hero, null);
+  });
+
+  it("uses earliest→latest delta as hero with total lost/gained wording", () => {
+    const series = [
+      {
+        weight_lbs: 200,
+        recorded_on: "2026-08-01",
+        created_at: "2026-08-01T10:00:00Z",
+      },
+      {
+        weight_lbs: 187.6,
+        recorded_on: "2026-08-20",
+        created_at: "2026-08-20T10:00:00Z",
+      },
+    ];
+    const progress = personalProgressFromLogs(series, 120);
+    assert.equal(progress.kind, "range");
+    assert.equal(progress.hero, "−12.4 lbs");
+    assert.equal(progress.heroCaption, "total lost");
+    assert.equal(progress.changeTone, "down");
+    assert.equal(progress.startDisplay, "200.0 lbs");
+    assert.equal(progress.latestDisplay, "187.6 lbs");
+    assert.equal(progress.exerciseLabel, "120 minutes");
+    assert.equal(progress.cta, null);
+    // Same delta as board summary
+    assert.equal(progress.weight.delta, weightSummaryFromSeries(series).delta);
+  });
+
+  it("labels gains and prompts for a second weigh-in when only one exists", () => {
+    const gain = personalProgressFromLogs(
+      [
+        {
+          weight_lbs: 180,
+          recorded_on: "2026-08-01",
+          created_at: "2026-08-01T10:00:00Z",
+        },
+        {
+          weight_lbs: 182.5,
+          recorded_on: "2026-08-15",
+          created_at: "2026-08-15T10:00:00Z",
+        },
+      ],
+      1
+    );
+    assert.equal(gain.hero, "+2.5 lbs");
+    assert.equal(gain.heroCaption, "total gained");
+    assert.equal(gain.changeTone, "up");
+    assert.equal(gain.exerciseLabel, "1 minute");
+
+    const single = personalProgressFromLogs(
+      [
+        {
+          weight_lbs: 190,
+          recorded_on: "2026-08-10",
+          created_at: "2026-08-10T10:00:00Z",
+        },
+      ],
+      0
+    );
+    assert.equal(single.kind, "single");
+    assert.equal(single.hero, null);
+    assert.equal(single.startDisplay, "190.0 lbs");
+    assert.equal(single.latestDisplay, "190.0 lbs");
+    assert.equal(single.cta?.label, "Log another weigh-in");
   });
 });
 

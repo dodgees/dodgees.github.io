@@ -105,6 +105,7 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 | --- | --- |
 | Sign in | Invited family only; password recovery is a fresh captain invite (no self-serve reset) |
 | Profile photo | Upload/replace/remove JPEG, PNG, or WebP (client-resized); shown on profile and board |
+| Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same 30-day window as the board) |
 | Log weight | Own entries only (write) |
 | Log exercise | Own entries only (write) |
 | Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
