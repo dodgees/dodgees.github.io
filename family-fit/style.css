@@ -474,6 +474,12 @@ body.profile-editor-open.has-log-dock .log-dock {
   min-width: 0;
 }
 
+#confirm-password-field[hidden],
+.stack label[hidden],
+.row-form label[hidden] {
+  display: none;
+}
+
 .label-narrow {
   flex: 0 1 7.5rem !important;
 }
