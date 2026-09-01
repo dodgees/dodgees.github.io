@@ -523,8 +523,7 @@ function renderSignedOut() {
   clearAvatarUrlRefresh();
   setProfileEditorOpen(false);
   collapseLogForms();
-  setAuthError("");
-  setAuthNotice("");
+  setAuthMode("signin");
   if (els.personalProgress) {
     els.personalProgress.innerHTML = '<p class="muted">Loading…</p>';
   }
