@@ -179,6 +179,7 @@ function setSubmitting(form, busy) {
 
 function setProfileEditorOpen(open) {
   els.profileEditor.hidden = !open;
+  document.body.classList.toggle("profile-editor-open", open);
   els.editNameBtn.setAttribute("aria-expanded", open ? "true" : "false");
   els.editNameBtn.textContent = open ? "Cancel" : "Edit profile";
   if (open) {
