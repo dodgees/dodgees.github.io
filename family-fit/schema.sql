@@ -6,7 +6,7 @@
 --   Do not re-run this whole file first — paste migrate-avatar-path.sql instead (one-shot).
 
 -- ---------------------------------------------------------------------------
--- Profiles (one row per invited family member)
+-- Profiles (one row per family member / auth user)
 -- ---------------------------------------------------------------------------
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -57,7 +57,7 @@ create index if not exists exercise_logs_user_id_recorded_on_idx
 comment on table public.exercise_logs is 'Exercise sessions; readable by signed-in family for competition.';
 
 -- ---------------------------------------------------------------------------
--- Auto-create profile on invite accept / first sign-in
+-- Auto-create profile on sign-up / first auth user insert
 -- ---------------------------------------------------------------------------
 create or replace function public.handle_new_user()
 returns trigger
@@ -85,7 +85,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Backfill profiles for users invited before the trigger existed
+-- Backfill profiles for users created before the trigger existed
 insert into public.profiles (id, display_name)
 select
   u.id,
@@ -124,7 +124,7 @@ create policy "profiles_update_own"
     )
   );
 
--- No insert/delete for clients; profile rows come from the auth trigger or the backfill above.
+-- No insert/delete for clients; profile rows come from the auth trigger (sign-up) or the backfill above.
 
 -- Weigh-ins: family can read; each member writes only their own
 drop policy if exists "weigh_ins_select_authenticated" on public.weigh_ins;

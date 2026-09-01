@@ -1,6 +1,8 @@
 # Family Fit
 
-Invite-only family weight-loss / healthy-living competition mini-app, served as a static sub-app at `/family-fit/` on this GitHub Pages site. Auth and data live in Supabase (Postgres + Auth). The frontend is vanilla HTML/CSS/JS — no build step.
+Family weight-loss / healthy-living competition mini-app, served as a static sub-app at `/family-fit/` on this GitHub Pages site. Auth and data live in Supabase (Postgres + Auth). The frontend is vanilla HTML/CSS/JS — no build step.
+
+Anyone with the Family Fit URL can **create an account** with email and password and join the competition board. Share the link only with family.
 
 > ### If you see `column profiles.avatar_path does not exist`
 >
@@ -31,7 +33,7 @@ Invite-only family weight-loss / healthy-living competition mini-app, served as 
 3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**, and that `profiles` has an `avatar_path` column.
 4. Confirm **Storage** has a private bucket named **`avatars`** (the SQL creates it; if the insert fails, create it manually — see below).
 
-Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who were invited before the trigger existed (or otherwise lack a profile row). Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, or log weigh-ins. Exception: the live error `column profiles.avatar_path does not exist` — use the one-shot callout at the top ([`migrate-avatar-path.sql`](./migrate-avatar-path.sql)), not a full `schema.sql` re-run.
+Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who lack a profile row. Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, or log weigh-ins. Exception: the live error `column profiles.avatar_path does not exist` — use the one-shot callout at the top ([`migrate-avatar-path.sql`](./migrate-avatar-path.sql)), not a full `schema.sql` re-run.
 
 #### Avatar storage (if the bucket is missing)
 
@@ -46,13 +48,15 @@ If **Storage → avatars** does not appear after running `schema.sql`:
 
 Members upload photos from **Edit profile** in the app. Paths are stored on `profiles.avatar_path`; the competition board shows signed-in family avatars after refresh.
 
-### 3. Disable public self-signup (invite-only)
+### 3. Enable email / password sign-up
 
 1. Go to **Authentication → Providers → Email**.
-2. Turn **off** “Enable sign ups” (wording may be “Allow new users to sign up”).
-3. Keep email/password (or magic link) enabled for invited users who already have accounts.
+2. Ensure **Email** is enabled.
+3. Turn **on** “Enable sign ups” (wording may be “Allow new users to sign up”).
+4. Optional (smoother family UX): under **Authentication → Providers → Email** (or **Authentication → Settings**), turn **off** “Confirm email” so Create account signs members in immediately. If confirm stays on, new users must click the confirmation link before Sign in works.
+5. Keep email/password enabled so existing members can still Sign in.
 
-Family members cannot create accounts themselves. Only the captain invites them.
+New accounts get a `profiles` row from the auth trigger in [`schema.sql`](./schema.sql) (same path as older invited users). They can set a display name in the app after sign-in.
 
 ### 4. Wire public config
 
@@ -67,15 +71,14 @@ window.FAMILY_FIT_CONFIG = {
 
 [`config.example.js`](./config.example.js) is a template if you need to recreate the file.
 
-### 5. Invite family members
+### 5. Optional: pre-create or reset accounts
 
-1. **Authentication → Users → Invite user** (or “Add user” / invite by email).
-2. Send the invite email for each family member.
-3. New invites get a `profiles` row from the auth trigger in `schema.sql`. If someone was invited before you ran the schema, re-run `schema.sql` so the backfill creates their profile.
-4. They can set a friendly display name in the app after sign-in.
-5. Forgotten passwords: send a fresh invite from the same Users screen — the app has no self-serve reset.
+Dashboard invites are optional now (self-serve Create account is the default). You can still:
 
-Optional: when inviting via the Admin API / dashboard, set user metadata `display_name` so the profile starts with a nicer name.
+1. **Authentication → Users → Invite user** (or “Add user”) to pre-create someone.
+2. Send a fresh invite / use **Send password recovery** from the Users screen if someone forgets their password — the app has no self-serve reset.
+
+Optional: when creating a user via the Admin API / dashboard, set user metadata `display_name` so the profile starts with a nicer name.
 
 ### 6. Auth URL allow-list (local + production)
 
@@ -87,6 +90,8 @@ Under **Authentication → URL Configuration**:
   - `https://dodgees.github.io/family-fit/`
   - `http://127.0.0.1:5500/family-fit/`
   - `http://localhost:5500/family-fit/`
+
+Needed for email confirmation links (if confirm email is on) and any auth redirects back into the static app.
 
 ## Local / preview
 
@@ -102,7 +107,7 @@ If `config.js` is empty, the app shows a setup message instead of talking to Sup
 
 ## Add to Home Screen (PWA)
 
-Family Fit ships a web app manifest and icons so members can install it from a phone browser (useful when opening invite links from texts).
+Family Fit ships a web app manifest and icons so members can install it from a phone browser.
 
 - **Android (Chrome):** open `/family-fit/`, tap the menu (⋮), then **Install app** or **Add to Home screen**.
 - **iOS (Safari):** open `/family-fit/`, tap **Share**, then **Add to Home Screen**. The icon should show as **Family Fit** with the green dumbbell icon.
@@ -113,12 +118,12 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 
 | Feature | Who |
 | --- | --- |
-| Sign in | Invited family only; password recovery is a fresh captain invite (no self-serve reset) |
+| Create account / Sign in | Anyone with the app URL (email + password); password recovery is captain-assisted in Supabase (no self-serve reset) |
 | Profile photo | Upload/replace/remove JPEG, PNG, or WebP (client-resized); shown on profile and board |
 | Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same 30-day window as the board) |
 | Log weight | Own entries only (write) |
 | Log exercise | Own entries only (write) |
-| Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
+| Competition board | Signed-in members can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
 
 Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for `anon`).
 
@@ -134,4 +139,4 @@ Full DDL + RLS: [`schema.sql`](./schema.sql).
 
 - Commit only the **anon** key in `config.js`. Rotate it in Supabase if it ever leaks alongside a misconfigured RLS policy.
 - Never commit `.env` files containing `service_role`.
-- Health data is sensitive: keep signup invite-only and leave RLS enabled.
+- Health data is sensitive: share the Family Fit URL only with family. Anyone who can create an account becomes an authenticated peer and can read the board (RLS). Leave RLS enabled.

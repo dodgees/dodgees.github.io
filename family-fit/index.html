@@ -33,7 +33,11 @@
 
     <section id="auth-panel" class="panel auth-panel" hidden>
       <h2>Welcome to the family challenge</h2>
-      <p class="auth-welcome">Sign in with the invite the captain sent you — this space is for our family only.</p>
+      <p class="auth-welcome">Create an account or sign in with email and password to join the family board.</p>
+      <div class="auth-mode" role="group" aria-label="Account mode">
+        <button type="button" class="auth-mode__btn is-active" id="auth-mode-signin" data-auth-mode="signin" aria-pressed="true">Sign in</button>
+        <button type="button" class="auth-mode__btn" id="auth-mode-signup" data-auth-mode="signup" aria-pressed="false">Create account</button>
+      </div>
       <form id="sign-in-form" class="stack form-card">
         <label>
           Email
@@ -43,10 +47,15 @@
           Password
           <input type="password" name="password" required autocomplete="current-password" minlength="6" enterkeyhint="go">
         </label>
-        <button type="submit" class="btn-primary btn-block">Sign in</button>
+        <label id="confirm-password-field" hidden>
+          Confirm password
+          <input type="password" name="confirm_password" autocomplete="new-password" minlength="6" enterkeyhint="go">
+        </label>
+        <button type="submit" class="btn-primary btn-block" id="auth-submit-btn">Sign in</button>
       </form>
-      <p class="auth-reset-hint">Forgot your password? Ask the captain to send a fresh invite — there’s no self-serve reset here.</p>
+      <p id="auth-hint" class="auth-reset-hint">Forgot your password? Ask the captain for help resetting it in Supabase — there’s no self-serve reset here.</p>
       <p id="auth-error" class="error" role="alert" hidden></p>
+      <p id="auth-notice" class="auth-notice" role="status" hidden></p>
     </section>
 
     <section id="app-panel" hidden>
