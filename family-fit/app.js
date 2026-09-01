@@ -196,7 +196,7 @@ function setAuthMode(mode) {
     els.authSubmitBtn.dataset.label = submitLabel;
   }
   els.authHint.textContent = signup
-    ? "After you create an account, the app opens the family board. Share this page only with family."
+    ? "Create an account with email and password. If email confirmation is on, check your inbox then sign in; otherwise the family board opens right away. Share this page only with family."
     : "Forgot your password? Ask the captain for help resetting it in Supabase — there’s no self-serve reset here.";
   setAuthError("");
   setAuthNotice("");
@@ -212,9 +212,11 @@ function authRedirectTo() {
       path += "/";
     }
     url.pathname = path;
+    url.search = "";
+    url.hash = "";
     return url.href;
   } catch {
-    return window.location.href;
+    return String(window.location.href).replace(/[?#].*$/, "");
   }
 }
 
