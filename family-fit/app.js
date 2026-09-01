@@ -183,6 +183,7 @@ function setAuthMode(mode) {
   if (confirmInput) {
     confirmInput.required = signup;
     confirmInput.disabled = !signup;
+    if (!signup) confirmInput.value = "";
   }
   const passwordInput = els.authForm.password;
   if (passwordInput) {
@@ -203,7 +204,15 @@ function setAuthMode(mode) {
 
 function authRedirectTo() {
   try {
-    return new URL(".", window.location.href).href;
+    const url = new URL(window.location.href);
+    let path = url.pathname;
+    if (/\.html?$/i.test(path)) {
+      path = path.replace(/[^/]+$/, "");
+    } else if (!path.endsWith("/")) {
+      path += "/";
+    }
+    url.pathname = path;
+    return url.href;
   } catch {
     return window.location.href;
   }
