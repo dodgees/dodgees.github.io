@@ -282,6 +282,30 @@ export function personalProgressFromLogs(weighSeries, exerciseMinutes = 0) {
   );
 }
 
+/**
+ * Progress UI when the board failed to load and there is no prior snapshot.
+ * Must not look like a true no-weigh-in empty state (no Log weight CTA).
+ */
+export function personalProgressUnavailable() {
+  return {
+    kind: "unavailable",
+    weight: null,
+    exerciseMinutes: 0,
+    exerciseLabel: null,
+    hero: null,
+    heroCaption: null,
+    changeTone: null,
+    startLbs: null,
+    latestLbs: null,
+    startDisplay: null,
+    latestDisplay: null,
+    cta: null,
+    emptyTitle: "Progress unavailable",
+    emptyBody:
+      "We couldn’t load your weigh-ins right now. Try refreshing — your logs are still saved.",
+  };
+}
+
 /** Profile update: PostgREST can return [] with no error — treat as failure. */
 export function profileUpdateStatus(data, error) {
   if (error) return { ok: false, message: error.message || String(error) };

@@ -11,6 +11,7 @@ import {
   localDateISO,
   loadBoardErrorShouldKeepBoard,
   personalProgressFromSummary,
+  personalProgressUnavailable,
   profileUpdateStatus,
   readBoardSortPreference,
   sortBoardMembers,
@@ -488,10 +489,14 @@ function setBoardSort(mode) {
 
 function emptyStateHtml({ title, body, ctaLabel, logMode, compact = false }) {
   const cls = compact ? "empty-state empty-state--compact" : "empty-state";
+  const cta =
+    ctaLabel && logMode
+      ? `<button type="button" class="btn-primary empty-state__cta" data-open-log="${escapeHtml(logMode)}">${escapeHtml(ctaLabel)}</button>`
+      : "";
   return `<div class="${cls}">
     <p class="empty-state__title">${escapeHtml(title)}</p>
     <p class="empty-state__body">${escapeHtml(body)}</p>
-    <button type="button" class="btn-primary empty-state__cta" data-open-log="${logMode}">${escapeHtml(ctaLabel)}</button>
+    ${cta}
   </div>`;
 }
 
@@ -508,17 +513,17 @@ function renderPersonalProgress(progress) {
     return;
   }
 
-  if (progress.kind === "empty") {
+  if (progress.kind === "empty" || progress.kind === "unavailable") {
     const exerciseNote =
-      progress.exerciseMinutes > 0
+      progress.kind === "empty" && progress.exerciseMinutes > 0
         ? `<p class="personal-progress__exercise-alone">${escapeHtml(progress.exerciseLabel)} exercise so far — add a weigh-in to track weight change.</p>`
         : "";
     els.personalProgress.innerHTML =
       emptyStateHtml({
         title: progress.emptyTitle,
         body: progress.emptyBody,
-        ctaLabel: progress.cta.label,
-        logMode: progress.cta.logMode,
+        ctaLabel: progress.cta?.label,
+        logMode: progress.cta?.logMode,
       }) + exerciseNote;
     return;
   }
@@ -706,7 +711,7 @@ async function loadBoard() {
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(err.message);
     els.leaderboard.innerHTML = "";
-    renderPersonalProgress(personalProgressFromSummary(null, 0));
+    renderPersonalProgress(personalProgressUnavailable());
     return false;
   }
 

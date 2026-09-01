@@ -14,6 +14,7 @@ import {
   writeBoardSortPreference,
   loadBoardErrorShouldKeepBoard,
   personalProgressFromLogs,
+  personalProgressUnavailable,
   BOARD_SORT_STORAGE_KEY,
 } from "../board-math.js";
 
@@ -283,6 +284,18 @@ describe("personalProgressFromLogs", () => {
     assert.equal(single.startDisplay, "190.0 lbs");
     assert.equal(single.latestDisplay, "190.0 lbs");
     assert.equal(single.cta?.label, "Log another weigh-in");
+  });
+});
+
+describe("personalProgressUnavailable", () => {
+  it("is distinct from empty and has no log CTA", () => {
+    const unavailable = personalProgressUnavailable();
+    const empty = personalProgressFromLogs([], 0);
+    assert.equal(unavailable.kind, "unavailable");
+    assert.equal(unavailable.cta, null);
+    assert.notEqual(unavailable.kind, empty.kind);
+    assert.notEqual(unavailable.emptyTitle, empty.emptyTitle);
+    assert.equal(empty.cta?.logMode, "weight");
   });
 });
 
