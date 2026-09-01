@@ -523,7 +523,6 @@ function renderSignedOut() {
   clearAvatarUrlRefresh();
   setProfileEditorOpen(false);
   collapseLogForms();
-  setAuthMode("signin");
   if (els.personalProgress) {
     els.personalProgress.innerHTML = '<p class="muted">Loading…</p>';
   }
@@ -1028,8 +1027,10 @@ async function refreshAppData() {
 }
 
 async function onSession(next) {
+  const wasSignedIn = Boolean(session);
   session = next;
   if (!session) {
+    if (wasSignedIn) setAuthMode("signin");
     renderSignedOut();
     return;
   }
