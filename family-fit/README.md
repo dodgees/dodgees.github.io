@@ -30,10 +30,10 @@ Anyone with the Family Fit URL can **create an account** with email and password
 
 1. In the Supabase dashboard: **SQL → New query**.
 2. Paste the contents of [`schema.sql`](./schema.sql) and run it.
-3. Confirm tables `profiles`, `weigh_ins`, and `exercise_logs` exist under **Table Editor**, and that `profiles` has an `avatar_path` column.
+3. Confirm tables `profiles`, `weigh_ins`, `exercise_logs`, `entry_comments`, and `entry_reactions` exist under **Table Editor**, and that `profiles` has an `avatar_path` column.
 4. Confirm **Storage** has a private bucket named **`avatars`** (the SQL creates it; if the insert fails, create it manually — see below).
 
-Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who lack a profile row. Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, or log weigh-ins. Exception: the live error `column profiles.avatar_path does not exist` — use the one-shot callout at the top ([`migrate-avatar-path.sql`](./migrate-avatar-path.sql)), not a full `schema.sql` re-run.
+Safe to re-run later: the script uses `IF NOT EXISTS` / `DROP POLICY IF EXISTS`, and it **backfills** `profiles` for any `auth.users` who lack a profile row. Re-run the same file if a member can sign in but cannot save a display name, upload a profile photo, log weigh-ins, or leave comments/reactions on entries. Exception: the live error `column profiles.avatar_path does not exist` — use the one-shot callout at the top ([`migrate-avatar-path.sql`](./migrate-avatar-path.sql)), not a full `schema.sql` re-run.
 
 #### Avatar storage (if the bucket is missing)
 
@@ -123,7 +123,9 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 | Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same 30-day window as the board) |
 | Log weight | Own entries only (write) |
 | Log exercise | Own entries only (write) |
-| Competition board | Signed-in members can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
+| Recent entries | Signed-in family can read everyone’s recent weigh-ins and workouts |
+| Encouragement | Comment or react (👍 ❤️ 🎉 💪 🔥) on any entry; edit/delete only your own |
+| Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
 
 Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for `anon`).
 
@@ -132,8 +134,21 @@ Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for 
 - **profiles** — `id` = `auth.users.id`, `display_name`, optional `avatar_path` (Storage object path)
 - **weigh_ins** — `user_id`, `weight_lbs`, `recorded_on`, optional `note`
 - **exercise_logs** — `user_id`, `activity`, `duration_minutes`, `recorded_on`, optional `note`
+- **entry_comments** — short encouragement on a weigh-in or exercise log (`weigh_in_id` xor `exercise_log_id`); author can write/edit/delete own; family can read
+- **entry_reactions** — allowed emojis 👍 ❤️ 🎉 💪 🔥, at most one of each per member per entry; owner can add/remove; family can read counts
 
 Full DDL + RLS: [`schema.sql`](./schema.sql).
+
+### Captain: apply encouragement tables (existing projects)
+
+If Family Fit was set up before comments/reactions shipped, re-run the full [`schema.sql`](./schema.sql) in **SQL → New query** (safe to re-run). Confirm:
+
+1. Tables **`entry_comments`** and **`entry_reactions`** appear in Table Editor.
+2. RLS is enabled on both; policies allow `authenticated` select for everyone, and insert/update/delete only when `author_id` / `user_id` = `auth.uid()` (no reaction update policy — toggle is delete + insert).
+3. Allowed reaction emojis match the check constraint: `👍`, `❤️`, `🎉`, `💪`, `🔥`.
+4. Comment body length is 1–280 characters (trimmed non-empty).
+
+Until that SQL runs, recent entries show a load-error banner and “Encouragement unavailable right now” on each card instead of comment/reaction controls.
 
 ## Security notes
 
