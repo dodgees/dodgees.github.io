@@ -32,18 +32,18 @@
     </section>
 
     <section id="auth-panel" class="panel auth-panel" hidden>
-      <h2>Welcome to the family challenge</h2>
-      <p class="auth-welcome">Sign in with email and password, or create an account with the family invite code from the captain.</p>
-      <div class="auth-mode" role="group" aria-label="Account mode">
+      <h2 id="auth-heading">Welcome to the family challenge</h2>
+      <p id="auth-welcome" class="auth-welcome">Sign in with email and password, or create an account with the family invite code from the captain.</p>
+      <div id="auth-mode-group" class="auth-mode" role="group" aria-label="Account mode">
         <button type="button" class="auth-mode__btn is-active" id="auth-mode-signin" data-auth-mode="signin" aria-pressed="true">Sign in</button>
         <button type="button" class="auth-mode__btn" id="auth-mode-signup" data-auth-mode="signup" aria-pressed="false">Create account</button>
       </div>
       <form id="sign-in-form" class="stack form-card">
-        <label>
+        <label id="auth-email-field">
           Email
           <input type="email" name="email" required autocomplete="username" inputmode="email" enterkeyhint="next">
         </label>
-        <label>
+        <label id="auth-password-field">
           Password
           <input type="password" name="password" required autocomplete="current-password" minlength="6" enterkeyhint="go">
         </label>
@@ -57,7 +57,21 @@
         </label>
         <button type="submit" class="btn-primary btn-block" id="auth-submit-btn">Sign in</button>
       </form>
-      <p id="auth-hint" class="auth-reset-hint">Forgot your password? Ask the captain for help resetting it in Supabase — there’s no self-serve reset here.</p>
+      <form id="recovery-form" class="stack form-card" hidden>
+        <label>
+          New password
+          <input type="password" name="new_password" required autocomplete="new-password" minlength="6" enterkeyhint="next">
+        </label>
+        <label>
+          Confirm new password
+          <input type="password" name="confirm_new_password" required autocomplete="new-password" minlength="6" enterkeyhint="go">
+        </label>
+        <button type="submit" class="btn-primary btn-block" id="recovery-submit-btn">Save new password</button>
+      </form>
+      <p id="auth-forgot-wrap" class="auth-reset-hint">
+        <button type="button" class="btn-link" id="forgot-password-btn">Forgot password?</button>
+      </p>
+      <p id="auth-hint" class="auth-reset-hint" hidden></p>
       <p id="auth-error" class="error" role="alert" hidden></p>
       <p id="auth-notice" class="auth-notice" role="status" hidden></p>
     </section>

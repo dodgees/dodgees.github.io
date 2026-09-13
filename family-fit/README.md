@@ -79,27 +79,41 @@ window.FAMILY_FIT_CONFIG = {
 - **Set or rotate:** change `inviteCode` in `config.js`, commit/deploy (or edit on the Pages host), then tell family the new code. Old accounts keep signing in with email/password; only new Create account attempts need the new code.
 - If `inviteCode` is missing or blank, Create account stays locked with a clear error (no silent open signup).
 
-### 5. Optional: pre-create or reset accounts
+### 5. Optional: pre-create accounts
 
 Self-serve Create account still needs the invite code above. You can also:
 
 1. **Authentication → Users → Invite user** (or “Add user”) to pre-create someone in the dashboard.
-2. Send a fresh invite / use **Send password recovery** from the Users screen if someone forgets their password — the app has no self-serve reset.
+2. Members who forget their password should use **Forgot password?** in the app (self-serve). Captain **Send password recovery** in the Users screen remains a fallback if email delivery fails.
 
 Optional: when creating a user via the Admin API / dashboard, set user metadata `display_name` so the profile starts with a nicer name.
 
 ### 6. Auth URL allow-list (local + production)
 
-Under **Authentication → URL Configuration**:
+Password reset and email confirmation both redirect back into `/family-fit/`. Under **Authentication → URL Configuration**, set:
 
-- **Site URL**: `https://www.erikdodge.com/family-fit/` (or your Pages URL).
-- **Redirect URLs**: include production and local preview, e.g.
+- **Site URL** (exact): `https://www.erikdodge.com/family-fit/`
+- **Redirect URLs** (allow-list; include every URL the app may pass as `redirectTo` / recovery return):
   - `https://www.erikdodge.com/family-fit/`
+  - `https://www.erikdodge.com/family-fit/index.html`
   - `https://dodgees.github.io/family-fit/`
+  - `https://dodgees.github.io/family-fit/index.html`
   - `http://127.0.0.1:5500/family-fit/`
+  - `http://127.0.0.1:5500/family-fit/index.html`
   - `http://localhost:5500/family-fit/`
+  - `http://localhost:5500/family-fit/index.html`
 
-Needed for email confirmation links (if confirm email is on) and any auth redirects back into the static app.
+Trailing slash matters: the app normalizes to a directory URL (`…/family-fit/`). Keep both the directory and `index.html` forms listed so recovery links work whether the browser lands on either path.
+
+### 7. Password reset email template (captain check)
+
+Under **Authentication → Email Templates → Reset password**:
+
+1. Leave the default template using **`{{ .ConfirmationURL }}`** (do not replace it with a bare Site URL). That link carries the recovery session and must return to an allow-listed `/family-fit/` URL above.
+2. Confirm **Authentication → Providers → Email** still has email/password enabled so reset emails can send.
+3. After changing Site URL / Redirect URLs, send yourself one **Forgot password?** from the live app and confirm the email link opens `/family-fit/` on the “Choose a new password” screen (not an error page and not the Supabase dashboard).
+
+If the link lands on the wrong host or shows “redirect URL not allowed”, fix the allow-list in §6 first.
 
 ## Local / preview
 
@@ -126,7 +140,7 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 
 | Feature | Who |
 | --- | --- |
-| Create account / Sign in | Create account needs the captain’s invite code + email/password; Sign in is email/password only (no invite). Password recovery is captain-assisted in Supabase (no self-serve reset) |
+| Create account / Sign in | Create account needs the captain’s invite code + email/password; Sign in is email/password only (no invite). **Forgot password?** sends a recovery email and returns to `/family-fit/` to set a new password |
 | Profile photo | Upload/replace/remove JPEG, PNG, or WebP (client-resized); shown on profile and board |
 | Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same selectable history window as the board: 7 / 30 / 90 / all-time) |
 | Log weight | Own entries only (write) |

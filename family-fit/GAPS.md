@@ -5,7 +5,7 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 
 ## Current feature set (brief)
 
-- Email/password create account (invite code required) and sign in
+- Email/password create account (invite code required), sign in, and self-serve **Forgot password?** reset
 - Display name and profile photo
 - Log weigh-ins and exercise (activity, minutes, optional note, date)
 - Personal progress (start → latest weight, total lost/gained, exercise minutes; shared history window)
@@ -17,9 +17,9 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 
 ## Gaps that hurt users
 
-### 1. No self-serve password reset
+### 1. ~~No self-serve password reset~~ (done)
 
-Forgot password requires asking the captain to reset it in the Supabase dashboard. High friction for non-technical family members and blocks sign-in until someone intervenes.
+Self-serve **Forgot password?** is in the app: members request a reset email and set a new password via the recovery link back into `/family-fit/`. Captain dashboard recovery remains a fallback only.
 
 ### 2. Invite gate is a public shared secret (not server-enforced)
 
@@ -47,13 +47,12 @@ The board ranks exercise minutes and weight change, but there are no target weig
 
 ### 8. Captain-only operations
 
-Schema/migrations, password resets, and account cleanup are dashboard work. Fine for the captain; invisible or confusing for everyone else when something breaks (e.g. missing columns, auth issues).
+Schema/migrations and account cleanup are dashboard work. Fine for the captain; invisible or confusing for everyone else when something breaks (e.g. missing columns, auth email delivery). Password reset is self-serve in the app.
 
 ## Highest-impact next slices
 
 If prioritizing fixes that reduce real user pain:
 
-1. Self-serve password reset
-2. Edit/delete own weigh-ins and exercise logs
+1. Edit/delete own weigh-ins and exercise logs
 
 Then consider notifications and custom date ranges / goals as product expansion rather than firefighting.
