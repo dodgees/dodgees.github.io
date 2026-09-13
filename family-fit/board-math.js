@@ -9,11 +9,80 @@ export function localDateISO(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
-/** 30-day competition cutoff using local calendar (not UTC toISOString). */
-export function competitionSinceDay(now = new Date()) {
+/** @typedef {"7"|"30"|"90"|"all"} BoardWindow */
+
+export const BOARD_WINDOWS = Object.freeze(["7", "30", "90", "all"]);
+export const DEFAULT_BOARD_WINDOW = "30";
+export const BOARD_WINDOW_STORAGE_KEY = "family-fit.boardWindow";
+
+/** @param {unknown} raw @returns {BoardWindow} */
+export function normalizeBoardWindow(raw) {
+  return BOARD_WINDOWS.includes(raw) ? raw : DEFAULT_BOARD_WINDOW;
+}
+
+/** Day count for a window, or null for all-time (no cutoff). */
+export function boardWindowDays(window = DEFAULT_BOARD_WINDOW) {
+  const w = normalizeBoardWindow(window);
+  if (w === "all") return null;
+  return Number(w);
+}
+
+/** Short scannable label: "30 days", "all time". */
+export function boardWindowShortLabel(window = DEFAULT_BOARD_WINDOW) {
+  const w = normalizeBoardWindow(window);
+  if (w === "all") return "all time";
+  return `${w} days`;
+}
+
+/** Hint eyebrow: "Last 30 days", "All time". */
+export function boardWindowHintLabel(window = DEFAULT_BOARD_WINDOW) {
+  const w = normalizeBoardWindow(window);
+  if (w === "all") return "All time";
+  return `Last ${w} days`;
+}
+
+/** Phrase used in empty/range copy: "the last 30 days", "all time". */
+export function boardWindowPhrase(window = DEFAULT_BOARD_WINDOW) {
+  const w = normalizeBoardWindow(window);
+  if (w === "all") return "all time";
+  return `the last ${w} days`;
+}
+
+/**
+ * Competition cutoff using local calendar (not UTC toISOString).
+ * @param {Date} [now]
+ * @param {BoardWindow|number|null} [windowOrDays] board window, day count, or null for all-time
+ * @returns {string|null} local YYYY-MM-DD, or null when there is no cutoff
+ */
+export function competitionSinceDay(now = new Date(), windowOrDays = 30) {
+  let days = windowOrDays;
+  if (typeof windowOrDays === "string") {
+    days = boardWindowDays(windowOrDays);
+  }
+  if (days == null) return null;
   const since = new Date(now);
-  since.setDate(since.getDate() - 30);
+  since.setDate(since.getDate() - Number(days));
   return localDateISO(since);
+}
+
+/** @returns {BoardWindow} */
+export function readBoardWindowPreference(storage = globalThis.localStorage) {
+  try {
+    return normalizeBoardWindow(storage?.getItem?.(BOARD_WINDOW_STORAGE_KEY));
+  } catch {
+    return DEFAULT_BOARD_WINDOW;
+  }
+}
+
+/** @param {BoardWindow|string} window @returns {BoardWindow} */
+export function writeBoardWindowPreference(window, storage = globalThis.localStorage) {
+  const next = normalizeBoardWindow(window);
+  try {
+    storage?.setItem?.(BOARD_WINDOW_STORAGE_KEY, next);
+  } catch {
+    /* ignore quota / private mode */
+  }
+  return next;
 }
 
 function sortWeighSeries(series) {
@@ -76,18 +145,27 @@ export function boardMemberAccessibleName(rank, member, isSelf = false) {
  * Stable order: recorded_on asc, then created_at asc.
  * Board cards use primary (glance delta/latest) and secondary (start→latest);
  * text remains the legacy full sentence.
+ *
+ * @param {Array<{ weight_lbs: number|string, recorded_on: string, created_at?: string }>} series
+ * @param {{ window?: BoardWindow }} [opts]
  */
-export function weightSummaryFromSeries(series) {
+export function weightSummaryFromSeries(series, { window = DEFAULT_BOARD_WINDOW } = {}) {
+  const period = boardWindowShortLabel(window);
+  const phrase = boardWindowPhrase(window);
+  const emptyText =
+    normalizeBoardWindow(window) === "all"
+      ? "No weigh-ins yet"
+      : `No weigh-ins in ${phrase}`;
   const sorted = sortWeighSeries(series);
   if (!sorted.length) {
     return {
       kind: "empty",
-      text: "No weigh-ins in the last 30 days",
+      text: emptyText,
       delta: null,
       startLbs: null,
       latestLbs: null,
       primary: "—",
-      secondary: "No weigh-ins in the last 30 days",
+      secondary: emptyText,
     };
   }
   if (sorted.length === 1) {
@@ -112,7 +190,7 @@ export function weightSummaryFromSeries(series) {
   const deltaLabel = formatWeightDelta(delta);
   return {
     kind: "range",
-    text: `${first.weight_lbs} → ${last.weight_lbs} lbs (${sign}${delta.toFixed(1)} over 30 days)`,
+    text: `${first.weight_lbs} → ${last.weight_lbs} lbs (${sign}${delta.toFixed(1)} over ${period})`,
     delta,
     startLbs,
     latestLbs,
@@ -176,9 +254,11 @@ export function writeBoardSortPreference(mode, storage = globalThis.localStorage
 /**
  * Legacy full-sentence weight summary (`weightSummaryFromSeries(...).text`).
  * Board cards render primary/secondary instead.
+ * @param {Array} series
+ * @param {{ window?: BoardWindow }} [opts]
  */
-export function weightLineFromSeries(series) {
-  return weightSummaryFromSeries(series).text;
+export function weightLineFromSeries(series, opts) {
+  return weightSummaryFromSeries(series, opts).text;
 }
 
 function formatLbsLabel(lbs) {
@@ -192,11 +272,17 @@ function formatLbsLabel(lbs) {
  *
  * @param {ReturnType<typeof weightSummaryFromSeries>} weight
  * @param {number} [exerciseMinutes]
+ * @param {{ window?: BoardWindow }} [opts]
  */
-export function personalProgressFromSummary(weight, exerciseMinutes = 0) {
+export function personalProgressFromSummary(
+  weight,
+  exerciseMinutes = 0,
+  { window = DEFAULT_BOARD_WINDOW } = {}
+) {
   const mins = Math.max(0, Number(exerciseMinutes) || 0);
   const exerciseLabel = `${mins} ${mins === 1 ? "minute" : "minutes"}`;
-  const summary = weight || weightSummaryFromSeries([]);
+  const summary = weight || weightSummaryFromSeries([], { window });
+  const phrase = boardWindowPhrase(window);
 
   if (summary.kind === "empty") {
     return {
@@ -214,7 +300,9 @@ export function personalProgressFromSummary(weight, exerciseMinutes = 0) {
       cta: { logMode: "weight", label: "Log weight" },
       emptyTitle: "Your progress starts here",
       emptyBody:
-        "Log a weigh-in to see starting weight, latest, and total change over the last 30 days.",
+        normalizeBoardWindow(window) === "all"
+          ? "Log a weigh-in to see starting weight, latest, and total change over all time."
+          : `Log a weigh-in to see starting weight, latest, and total change over ${phrase}.`,
     };
   }
 
@@ -274,11 +362,17 @@ export function personalProgressFromSummary(weight, exerciseMinutes = 0) {
  *
  * @param {Array<{ weight_lbs: number|string, recorded_on: string, created_at?: string }>} weighSeries
  * @param {number} [exerciseMinutes]
+ * @param {{ window?: BoardWindow }} [opts]
  */
-export function personalProgressFromLogs(weighSeries, exerciseMinutes = 0) {
+export function personalProgressFromLogs(
+  weighSeries,
+  exerciseMinutes = 0,
+  opts = {}
+) {
   return personalProgressFromSummary(
-    weightSummaryFromSeries(weighSeries),
-    exerciseMinutes
+    weightSummaryFromSeries(weighSeries, opts),
+    exerciseMinutes,
+    opts
   );
 }
 
@@ -357,5 +451,19 @@ export function loadBoardErrorShouldKeepBoard(
 ) {
   return (
     previousBoardMembers !== null && generation > previousRenderedGeneration
+  );
+}
+
+/**
+ * Whether an in-flight loadBoard completion should commit board UI/state.
+ * Ignores superseded generations (newer load started) and already-rendered newer results.
+ */
+export function loadBoardResultShouldCommit(
+  generation,
+  latestGeneration,
+  renderedGeneration
+) {
+  return (
+    generation === latestGeneration && generation >= renderedGeneration
   );
 }

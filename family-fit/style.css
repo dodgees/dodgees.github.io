@@ -766,6 +766,45 @@ body.has-log-dock .toast {
   box-shadow: var(--shadow);
 }
 
+.board-window {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  padding: 0.3rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.board-window__btn {
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.78rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.35rem;
+  white-space: nowrap;
+}
+
+.board-window__btn:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.board-window__btn.is-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.board-window__btn.is-active:hover {
+  background: var(--accent-hover);
+  color: var(--accent-ink);
+}
+
 .board-sort__btn {
   width: 100%;
   background: transparent;
