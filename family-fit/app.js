@@ -39,6 +39,10 @@ import {
   normalizeCommentBody,
 } from "./encouragement.js";
 import { validateSignupInvite } from "./invite.js";
+import {
+  RECOVERY_LINK_FAILED_NOTICE,
+  resolvePendingPasswordRecovery,
+} from "./auth-recovery.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -1544,21 +1548,17 @@ async function onSession(next, event) {
   const wasSignedIn = Boolean(session);
   session = next;
 
-  if (pendingPasswordRecovery) {
-    if (session) {
-      renderPasswordRecovery();
-      return;
-    }
-    // detectSessionInUrl may resolve after the first getSession(); keep the recovery UI up.
-    if (event !== "SIGNED_OUT") {
-      els.auth.hidden = false;
-      els.app.hidden = true;
-      document.body.classList.remove("has-log-dock");
-      setAuthMode("recovery", { clearMessages: false });
-      setAuthNotice("Opening your reset link…");
-      return;
-    }
+  const recoveryOutcome = resolvePendingPasswordRecovery(pendingPasswordRecovery, session);
+  if (recoveryOutcome === "show-recovery") {
+    renderPasswordRecovery();
+    return;
+  }
+  if (recoveryOutcome === "link-failed") {
     pendingPasswordRecovery = false;
+    setAuthMode("signin", { clearMessages: false });
+    setAuthNotice(RECOVERY_LINK_FAILED_NOTICE);
+    renderSignedOut();
+    return;
   }
 
   if (!session) {
