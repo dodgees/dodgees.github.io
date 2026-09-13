@@ -2,22 +2,31 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   boardMemberAccessibleName,
+  boardWindowDays,
+  boardWindowHintLabel,
+  boardWindowPhrase,
+  boardWindowShortLabel,
   competitionSinceDay,
   formatWeightDelta,
   isMissingAvatarPathError,
   localDateISO,
   missingAvatarPathOperatorMessage,
+  normalizeBoardWindow,
   profileUpdateStatus,
   readBoardSortPreference,
+  readBoardWindowPreference,
   sortBoardMembers,
   weightLineFromSeries,
   weightPhraseForA11y,
   weightSummaryFromSeries,
   writeBoardSortPreference,
+  writeBoardWindowPreference,
   loadBoardErrorShouldKeepBoard,
   personalProgressFromLogs,
   personalProgressUnavailable,
   BOARD_SORT_STORAGE_KEY,
+  BOARD_WINDOW_STORAGE_KEY,
+  DEFAULT_BOARD_WINDOW,
 } from "../board-math.js";
 
 describe("competitionSinceDay (local calendar)", () => {
@@ -40,6 +49,42 @@ describe("competitionSinceDay (local calendar)", () => {
       assert.equal(sinceDay, "2026-07-31");
       assert.equal(utcSlice, "2026-08-01");
     }
+  });
+
+  it("supports 7 / 90 day windows and null all-time cutoff", () => {
+    const noon = new Date(2026, 8, 13, 12, 0, 0);
+    assert.equal(competitionSinceDay(noon, "7"), localDateISO(new Date(2026, 8, 6)));
+    assert.equal(competitionSinceDay(noon, 90), localDateISO(new Date(2026, 5, 15)));
+    assert.equal(competitionSinceDay(noon, "all"), null);
+    assert.equal(boardWindowDays("all"), null);
+    assert.equal(boardWindowDays("30"), 30);
+  });
+});
+
+describe("board window labels and preference storage", () => {
+  it("normalizes and labels windows", () => {
+    assert.equal(normalizeBoardWindow("90"), "90");
+    assert.equal(normalizeBoardWindow("nope"), DEFAULT_BOARD_WINDOW);
+    assert.equal(boardWindowShortLabel("7"), "7 days");
+    assert.equal(boardWindowShortLabel("all"), "all time");
+    assert.equal(boardWindowHintLabel("30"), "Last 30 days");
+    assert.equal(boardWindowHintLabel("all"), "All time");
+    assert.equal(boardWindowPhrase("90"), "the last 90 days");
+    assert.equal(boardWindowPhrase("all"), "all time");
+  });
+
+  it("defaults to 30 and round-trips preference", () => {
+    const store = new Map();
+    const fake = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+    };
+    assert.equal(readBoardWindowPreference(fake), "30");
+    assert.equal(writeBoardWindowPreference("all", fake), "all");
+    assert.equal(store.get(BOARD_WINDOW_STORAGE_KEY), "all");
+    assert.equal(readBoardWindowPreference(fake), "all");
+    assert.equal(writeBoardWindowPreference("7", fake), "7");
+    assert.equal(readBoardWindowPreference(fake), "7");
   });
 });
 
@@ -108,6 +153,29 @@ describe("weightSummaryFromSeries", () => {
     assert.equal(summary.primary, "−5.0 lbs");
     assert.equal(summary.secondary, "200 → 195 lbs");
     assert.equal(summary.text, weightLineFromSeries(series));
+  });
+
+  it("reflects the active window in empty and range copy", () => {
+    const emptyAll = weightSummaryFromSeries([], { window: "all" });
+    assert.equal(emptyAll.text, "No weigh-ins yet");
+    const empty7 = weightSummaryFromSeries([], { window: "7" });
+    assert.equal(empty7.text, "No weigh-ins in the last 7 days");
+    const range = weightSummaryFromSeries(
+      [
+        {
+          weight_lbs: 200,
+          recorded_on: "2026-01-01",
+          created_at: "2026-01-01T10:00:00Z",
+        },
+        {
+          weight_lbs: 190,
+          recorded_on: "2026-08-01",
+          created_at: "2026-08-01T10:00:00Z",
+        },
+      ],
+      { window: "all" }
+    );
+    assert.equal(range.text, "200 → 190 lbs (-10.0 over all time)");
   });
 });
 
@@ -262,7 +330,11 @@ describe("personalProgressFromLogs", () => {
     assert.equal(progress.exerciseLabel, "45 minutes");
     assert.equal(progress.cta?.logMode, "weight");
     assert.match(progress.emptyTitle, /progress/i);
+    assert.match(progress.emptyBody, /last 30 days/);
     assert.equal(progress.hero, null);
+
+    const allTimeEmpty = personalProgressFromLogs([], 0, { window: "all" });
+    assert.match(allTimeEmpty.emptyBody, /all time/);
   });
 
   it("uses earliest→latest delta as hero with total lost/gained wording", () => {

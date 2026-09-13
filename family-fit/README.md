@@ -128,12 +128,12 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 | --- | --- |
 | Create account / Sign in | Create account needs the captain’s invite code + email/password; Sign in is email/password only (no invite). Password recovery is captain-assisted in Supabase (no self-serve reset) |
 | Profile photo | Upload/replace/remove JPEG, PNG, or WebP (client-resized); shown on profile and board |
-| Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same 30-day window as the board) |
+| Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same selectable history window as the board: 7 / 30 / 90 / all-time) |
 | Log weight | Own entries only (write) |
 | Log exercise | Own entries only (write) |
 | Recent entries | Signed-in family can read everyone’s recent weigh-ins and workouts |
 | Encouragement | Comment or react (👍 ❤️ 🎉 💪 🔥) on any entry; edit/delete only your own |
-| Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change (choice saved in the browser) |
+| Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change; history window choice saved in the browser |
 
 Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for `anon`).
 

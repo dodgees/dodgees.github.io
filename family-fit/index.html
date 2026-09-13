@@ -107,7 +107,13 @@
       <section class="panel progress-section" id="progress-section" aria-labelledby="progress-heading">
         <div class="section-head">
           <h2 id="progress-heading">Your progress</h2>
-          <p class="hint">Last 30 days — start to latest, total change, and exercise.</p>
+          <p class="hint" id="progress-window-hint">Last 30 days — start to latest, total change, and exercise.</p>
+        </div>
+        <div class="board-window" role="group" aria-label="History window">
+          <button type="button" class="board-window__btn" data-window="7" aria-pressed="false">7 days</button>
+          <button type="button" class="board-window__btn is-active" data-window="30" aria-pressed="true">30 days</button>
+          <button type="button" class="board-window__btn" data-window="90" aria-pressed="false">90 days</button>
+          <button type="button" class="board-window__btn" data-window="all" aria-pressed="false">All time</button>
         </div>
         <div id="personal-progress" class="personal-progress" aria-live="polite">
           <p class="muted">Loading…</p>
@@ -117,7 +123,7 @@
       <section class="panel" id="board-section">
         <div class="section-head">
           <h2>Competition board</h2>
-          <p class="hint">Last 30 days — latest weigh-ins and exercise minutes.</p>
+          <p class="hint" id="board-window-hint">Last 30 days — latest weigh-ins and exercise minutes.</p>
         </div>
         <div class="board-sort" role="group" aria-label="Sort competition board">
           <button type="button" class="board-sort__btn" id="sort-exercise-btn" data-sort="exercise" aria-pressed="true">By exercise</button>

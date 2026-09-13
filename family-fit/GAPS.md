@@ -8,8 +8,8 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 - Email/password create account (invite code required) and sign in
 - Display name and profile photo
 - Log weigh-ins and exercise (activity, minutes, optional note, date)
-- Personal progress (start → latest weight, total lost/gained, exercise minutes; 30-day window)
-- Competition board with sort by exercise or weight change
+- Personal progress (start → latest weight, total lost/gained, exercise minutes; shared history window)
+- Competition board with sort by exercise or weight change and selectable history window (7 / 30 / 90 / all-time)
 - Recent entries feed (family-wide)
 - Encouragement: comments and emoji reactions on entries
 - PWA install to home screen
@@ -33,9 +33,9 @@ Wrong weight, bad date, or typo on an exercise entry cannot be fixed in the app.
 
 Encouragement and competition only work when people open the app. There are no push notifications, email nudges, or “log today” reminders, so participation can quietly drop.
 
-### 5. Fixed 30-day window only
+### 5. No custom date range or weekly goals view
 
-Personal progress and the board use the same rolling ~30-day window. There is no full-competition history, weekly view, or custom date range. Longer competitions lose early progress context.
+Members can pick 7 / 30 / 90 / all-time for personal progress and the board, but there is still no arbitrary custom range, calendar week view, or goal-period breakdown.
 
 ### 6. Recent entries are capped and not real-time
 

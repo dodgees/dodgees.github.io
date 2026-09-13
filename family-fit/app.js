@@ -7,6 +7,8 @@ import {
 } from "./avatar.js";
 import {
   boardMemberAccessibleName,
+  boardWindowHintLabel,
+  boardWindowPhrase,
   competitionSinceDay,
   isMissingAvatarPathError,
   localDateISO,
@@ -16,9 +18,11 @@ import {
   personalProgressUnavailable,
   profileUpdateStatus,
   readBoardSortPreference,
+  readBoardWindowPreference,
   sortBoardMembers,
   weightSummaryFromSeries,
   writeBoardSortPreference,
+  writeBoardWindowPreference,
 } from "./board-math.js";
 import {
   COMMENT_MAX_LENGTH,
@@ -76,6 +80,9 @@ const els = {
   boardSortStatus: document.getElementById("board-sort-status"),
   sortExerciseBtn: document.getElementById("sort-exercise-btn"),
   sortWeightBtn: document.getElementById("sort-weight-btn"),
+  progressWindowHint: document.getElementById("progress-window-hint"),
+  boardWindowHint: document.getElementById("board-window-hint"),
+  boardWindowBtns: document.querySelectorAll(".board-window__btn"),
   recentEntries: document.getElementById("recent-entries"),
   personalProgress: document.getElementById("personal-progress"),
   status: document.getElementById("form-status"),
@@ -91,6 +98,8 @@ let activeLog = null;
 let highlightTarget = null;
 /** @type {"exercise"|"weight"} */
 let boardSort = readBoardSortPreference();
+/** @type {import("./board-math.js").BoardWindow} */
+let boardWindow = readBoardWindowPreference();
 /** @type {Array<{ id: string, name: string, weight: object, mins: number, avatarPath: string|null, avatarUrl: string|null }> | null} */
 let boardMembers = null;
 /** @type {string|null} */
@@ -631,10 +640,36 @@ function syncSortControls() {
   els.boardSortStatus.textContent = `Sorted by ${sortLabel(boardSort)}`;
 }
 
+function syncWindowControls() {
+  const label = boardWindowHintLabel(boardWindow);
+  if (els.progressWindowHint) {
+    els.progressWindowHint.textContent = `${label} — start to latest, total change, and exercise.`;
+  }
+  if (els.boardWindowHint) {
+    els.boardWindowHint.textContent = `${label} — latest weigh-ins and exercise minutes.`;
+  }
+  els.boardWindowBtns.forEach((btn) => {
+    const active = btn.getAttribute("data-window") === boardWindow;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
 function setBoardSort(mode) {
   boardSort = writeBoardSortPreference(mode);
   syncSortControls();
   if (boardMembers) renderBoard();
+}
+
+function setBoardWindow(nextWindow) {
+  const next = writeBoardWindowPreference(nextWindow);
+  if (next === boardWindow) {
+    syncWindowControls();
+    return;
+  }
+  boardWindow = next;
+  syncWindowControls();
+  if (session) loadBoard();
 }
 
 function emptyStateHtml({ title, body, ctaLabel, logMode, compact = false }) {
@@ -760,7 +795,7 @@ function renderBoard() {
           </div>
           <div class="member-delta${weightClass}">${escapeHtml(m.weight.primary)}</div>
           <div class="member-range">${escapeHtml(m.weight.secondary)}</div>
-          <div class="member-exercise" title="${m.mins} minutes in the last 30 days">
+          <div class="member-exercise" title="${m.mins} minutes in ${boardWindowPhrase(boardWindow)}">
             <span class="exercise-chip">${escapeHtml(exerciseLabel)}</span>
             <span class="exercise-bar"><span class="exercise-bar__fill" style="width:${barPct}%"></span></span>
           </div>
@@ -804,15 +839,17 @@ function commitLoadBoardRender(generation) {
 function syncPersonalProgressFromBoard() {
   const uid = session?.user?.id;
   if (!uid || !boardMembers) {
-    renderPersonalProgress(personalProgressFromSummary(null, 0));
+    renderPersonalProgress(personalProgressFromSummary(null, 0, { window: boardWindow }));
     return;
   }
   const self = boardMembers.find((m) => m.id === uid);
   if (!self) {
-    renderPersonalProgress(personalProgressFromSummary(null, 0));
+    renderPersonalProgress(personalProgressFromSummary(null, 0, { window: boardWindow }));
     return;
   }
-  renderPersonalProgress(personalProgressFromSummary(self.weight, self.mins));
+  renderPersonalProgress(
+    personalProgressFromSummary(self.weight, self.mins, { window: boardWindow })
+  );
 }
 
 async function loadBoard() {
@@ -824,21 +861,26 @@ async function loadBoard() {
   renderPersonalProgress(null);
   boardMembers = null;
 
-  const sinceDay = competitionSinceDay();
+  const sinceDay = competitionSinceDay(new Date(), boardWindow);
   const wantAvatar = avatarPathColumnOk !== false;
+
+  let weighQuery = supabase
+    .from("weigh_ins")
+    .select("user_id, weight_lbs, recorded_on, created_at")
+    .order("recorded_on", { ascending: true })
+    .order("created_at", { ascending: true });
+  let exerciseQuery = supabase
+    .from("exercise_logs")
+    .select("user_id, duration_minutes, recorded_on, activity");
+  if (sinceDay) {
+    weighQuery = weighQuery.gte("recorded_on", sinceDay);
+    exerciseQuery = exerciseQuery.gte("recorded_on", sinceDay);
+  }
 
   const [profilesRes0, weighRes, exerciseRes] = await Promise.all([
     fetchProfiles(wantAvatar),
-    supabase
-      .from("weigh_ins")
-      .select("user_id, weight_lbs, recorded_on, created_at")
-      .gte("recorded_on", sinceDay)
-      .order("recorded_on", { ascending: true })
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("exercise_logs")
-      .select("user_id, duration_minutes, recorded_on, activity")
-      .gte("recorded_on", sinceDay),
+    weighQuery,
+    exerciseQuery,
   ]);
 
   let profilesRes = profilesRes0;
@@ -925,7 +967,7 @@ async function loadBoard() {
 
   boardMembers = profiles.map((p) => {
     const series = weighByUser.get(p.id) || [];
-    const weight = weightSummaryFromSeries(series);
+    const weight = weightSummaryFromSeries(series, { window: boardWindow });
     const mins = minutesByUser.get(p.id) || 0;
     const avatarPath =
       avatarPathColumnOk === false ? null : p.avatar_path || null;
@@ -945,6 +987,7 @@ async function loadBoard() {
   }
 
   commitLoadBoardRender(generation);
+  syncWindowControls();
   syncSortControls();
   renderBoard();
   syncPersonalProgressFromBoard();
@@ -1537,6 +1580,13 @@ function wireForms() {
 
   els.sortExerciseBtn.addEventListener("click", () => setBoardSort("exercise"));
   els.sortWeightBtn.addEventListener("click", () => setBoardSort("weight"));
+  els.boardWindowBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const value = btn.getAttribute("data-window");
+      if (value) setBoardWindow(value);
+    });
+  });
+  syncWindowControls();
   els.leaderboard.addEventListener("error", handleBoardAvatarError, true);
 
   els.app.addEventListener("click", (ev) => {
