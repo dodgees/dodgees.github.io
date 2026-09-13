@@ -15,11 +15,12 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+-- Additive migration for projects that ran an older schema.sql (must run
+-- before COMMENT ON COLUMN avatar_path, or existing DBs without the column fail).
+alter table public.profiles add column if not exists avatar_path text;
+
 comment on table public.profiles is 'Family member display names and optional avatar paths for the competition.';
 comment on column public.profiles.avatar_path is 'Object path in the avatars storage bucket, e.g. {user_id}/avatar.webp';
-
--- Additive migration for projects that ran an older schema.sql
-alter table public.profiles add column if not exists avatar_path text;
 
 -- ---------------------------------------------------------------------------
 -- Weigh-ins
