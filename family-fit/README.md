@@ -133,7 +133,7 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 | Log exercise | Own entries only (write) |
 | Recent entries | Signed-in family can read everyone’s recent weigh-ins and workouts |
 | Encouragement | Comment or react (👍 ❤️ 🎉 💪 🔥) on any entry; edit/delete only your own |
-| Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change; history window choice saved in the browser |
+| Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change and the same history window as personal progress; both choices saved in the browser |
 
 Anonymous visitors cannot read weigh-ins or exercise logs (RLS; no policies for `anon`).
 

@@ -56,4 +56,4 @@ If prioritizing fixes that reduce real user pain:
 1. Self-serve password reset
 2. Edit/delete own weigh-ins and exercise logs
 
-Then consider notifications and richer history/goals as product expansion rather than firefighting.
+Then consider notifications and custom date ranges / goals as product expansion rather than firefighting.
