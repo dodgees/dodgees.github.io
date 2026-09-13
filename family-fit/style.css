@@ -235,6 +235,17 @@ h2 {
   line-height: 1.45;
 }
 
+.auth-reset-hint .btn-link {
+  font-size: 0.95rem;
+  font-family: inherit;
+  padding: 0.35rem 0;
+  min-height: 44px;
+}
+
+.auth-reset-hint[hidden] {
+  display: none !important;
+}
+
 .auth-notice {
   font-size: 0.95rem;
   color: var(--text);
@@ -247,6 +258,14 @@ h2 {
 }
 
 .auth-notice[hidden] {
+  display: none !important;
+}
+
+.auth-mode[hidden],
+#sign-in-form[hidden],
+#recovery-form[hidden],
+#auth-password-field[hidden],
+#auth-forgot-wrap[hidden] {
   display: none !important;
 }
 

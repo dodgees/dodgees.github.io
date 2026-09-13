@@ -48,10 +48,18 @@ const els = {
   auth: document.getElementById("auth-panel"),
   app: document.getElementById("app-panel"),
   authForm: document.getElementById("sign-in-form"),
+  recoveryForm: document.getElementById("recovery-form"),
   authError: document.getElementById("auth-error"),
   authNotice: document.getElementById("auth-notice"),
   authHint: document.getElementById("auth-hint"),
+  authHeading: document.getElementById("auth-heading"),
+  authWelcome: document.getElementById("auth-welcome"),
+  authModeGroup: document.getElementById("auth-mode-group"),
+  authPasswordField: document.getElementById("auth-password-field"),
+  authForgotWrap: document.getElementById("auth-forgot-wrap"),
+  forgotPasswordBtn: document.getElementById("forgot-password-btn"),
   authSubmitBtn: document.getElementById("auth-submit-btn"),
+  recoverySubmitBtn: document.getElementById("recovery-submit-btn"),
   authModeSignin: document.getElementById("auth-mode-signin"),
   authModeSignup: document.getElementById("auth-mode-signup"),
   confirmPasswordField: document.getElementById("confirm-password-field"),
@@ -92,8 +100,10 @@ const els = {
 
 let supabase = null;
 let session = null;
-/** @type {"signin"|"signup"} */
+/** @type {"signin"|"signup"|"forgot"|"recovery"} */
 let authMode = "signin";
+/** True while the user must choose a new password after the email recovery link. */
+let pendingPasswordRecovery = false;
 /** @type {"weight"|"exercise"|null} */
 let activeLog = null;
 /** @type {{ kind: "weight"|"exercise", id: string } | null} */
@@ -208,14 +218,56 @@ function setAuthNotice(msg) {
   els.authNotice.textContent = msg || "";
 }
 
-function setAuthMode(mode) {
-  authMode = mode === "signup" ? "signup" : "signin";
+function urlLooksLikePasswordRecovery() {
+  try {
+    const hashParams = new URLSearchParams(String(window.location.hash || "").replace(/^#/, ""));
+    if (hashParams.get("type") === "recovery") return true;
+    const searchParams = new URLSearchParams(window.location.search || "");
+    return searchParams.get("type") === "recovery";
+  } catch {
+    return false;
+  }
+}
+
+function setAuthMode(mode, { clearMessages = true } = {}) {
+  if (mode === "signup" || mode === "forgot" || mode === "recovery") {
+    authMode = mode;
+  } else {
+    authMode = "signin";
+  }
+
   const signup = authMode === "signup";
-  els.authModeSignin.classList.toggle("is-active", !signup);
-  els.authModeSignup.classList.toggle("is-active", signup);
-  els.authModeSignin.setAttribute("aria-pressed", signup ? "false" : "true");
-  els.authModeSignup.setAttribute("aria-pressed", signup ? "true" : "false");
+  const forgot = authMode === "forgot";
+  const recovery = authMode === "recovery";
+  const signin = authMode === "signin";
+
+  els.authModeGroup.hidden = forgot || recovery;
+  els.authForm.hidden = recovery;
+  els.recoveryForm.hidden = !recovery;
+  els.authForgotWrap.hidden = !signin;
+  els.authPasswordField.hidden = forgot;
   els.confirmPasswordField.hidden = !signup;
+
+  els.authModeSignin.classList.toggle("is-active", signin);
+  els.authModeSignup.classList.toggle("is-active", signup);
+  els.authModeSignin.setAttribute("aria-pressed", signin ? "true" : "false");
+  els.authModeSignup.setAttribute("aria-pressed", signup ? "true" : "false");
+
+  if (els.authHeading) {
+    els.authHeading.textContent = recovery
+      ? "Choose a new password"
+      : forgot
+        ? "Reset your password"
+        : "Welcome to the family challenge";
+  }
+  if (els.authWelcome) {
+    els.authWelcome.textContent = recovery
+      ? "Pick a new password for your Family Fit account. You’ll stay signed in afterward."
+      : forgot
+        ? "Enter the email you use for Family Fit. We’ll send a link so you can choose a new password."
+        : "Sign in with email and password, or create an account with the family invite code from the captain.";
+  }
+
   const confirmInput = els.authForm.confirm_password;
   if (confirmInput) {
     confirmInput.required = signup;
@@ -233,19 +285,43 @@ function setAuthMode(mode) {
   }
   const passwordInput = els.authForm.password;
   if (passwordInput) {
+    passwordInput.required = !forgot && !recovery;
+    passwordInput.disabled = forgot || recovery;
+    if (forgot) passwordInput.value = "";
     passwordInput.autocomplete = signup ? "new-password" : "current-password";
     passwordInput.enterKeyHint = "go";
   }
-  const submitLabel = signup ? "Create account" : "Sign in";
+  const emailInput = els.authForm.email;
+  if (emailInput) {
+    emailInput.enterKeyHint = forgot ? "send" : "next";
+  }
+
+  const submitLabel = signup ? "Create account" : forgot ? "Email me a reset link" : "Sign in";
   els.authSubmitBtn.textContent = submitLabel;
   if (els.authSubmitBtn.dataset.label) {
     els.authSubmitBtn.dataset.label = submitLabel;
   }
-  els.authHint.textContent = signup
-    ? "Create an account with email, password, and the family invite code from the captain. If email confirmation is on, check your inbox then sign in; otherwise the family board opens right away."
-    : "Forgot your password? Ask the captain for help resetting it in Supabase — there’s no self-serve reset here.";
-  setAuthError("");
-  setAuthNotice("");
+
+  if (forgot) {
+    els.authHint.hidden = false;
+    els.authHint.innerHTML =
+      '<button type="button" class="btn-link" id="back-to-signin-btn">Back to sign in</button>';
+    els.authHint.querySelector("#back-to-signin-btn")?.addEventListener("click", () => {
+      setAuthMode("signin");
+    });
+  } else if (signup) {
+    els.authHint.hidden = false;
+    els.authHint.textContent =
+      "Create an account with email, password, and the family invite code from the captain. If email confirmation is on, check your inbox then sign in; otherwise the family board opens right away.";
+  } else {
+    els.authHint.hidden = true;
+    els.authHint.textContent = "";
+  }
+
+  if (clearMessages) {
+    setAuthError("");
+    setAuthNotice("");
+  }
 }
 
 function authRedirectTo() {
@@ -1451,9 +1527,40 @@ async function refreshAppData() {
   syncProfileAvatarUi();
 }
 
-async function onSession(next) {
+function renderPasswordRecovery() {
+  els.auth.hidden = false;
+  els.app.hidden = true;
+  document.body.classList.remove("has-log-dock");
+  setProfileEditorOpen(false);
+  collapseLogForms();
+  setAuthMode("recovery", { clearMessages: false });
+}
+
+async function onSession(next, event) {
+  if (event === "PASSWORD_RECOVERY") {
+    pendingPasswordRecovery = true;
+  }
+
   const wasSignedIn = Boolean(session);
   session = next;
+
+  if (pendingPasswordRecovery) {
+    if (session) {
+      renderPasswordRecovery();
+      return;
+    }
+    // detectSessionInUrl may resolve after the first getSession(); keep the recovery UI up.
+    if (event !== "SIGNED_OUT") {
+      els.auth.hidden = false;
+      els.app.hidden = true;
+      document.body.classList.remove("has-log-dock");
+      setAuthMode("recovery", { clearMessages: false });
+      setAuthNotice("Opening your reset link…");
+      return;
+    }
+    pendingPasswordRecovery = false;
+  }
+
   if (!session) {
     if (wasSignedIn) setAuthMode("signin");
     renderSignedOut();
@@ -1474,16 +1581,37 @@ async function onSession(next) {
 function wireForms() {
   els.authModeSignin.addEventListener("click", () => setAuthMode("signin"));
   els.authModeSignup.addEventListener("click", () => setAuthMode("signup"));
+  els.forgotPasswordBtn.addEventListener("click", () => setAuthMode("forgot"));
 
   els.authForm.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     setAuthError("");
     setAuthNotice("");
     setSubmitting(els.authForm, true);
+    if (authMode === "forgot") {
+      els.authSubmitBtn.textContent = "Sending…";
+    }
     const fd = new FormData(els.authForm);
     const email = String(fd.get("email") || "").trim();
     const password = String(fd.get("password") || "");
     try {
+      if (authMode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: authRedirectTo(),
+        });
+        if (error) {
+          setAuthError(error.message);
+          return;
+        }
+        setAuthMode("signin", { clearMessages: false });
+        els.authForm.email.value = email;
+        els.authForm.password.value = "";
+        setAuthNotice(
+          "If that email has a Family Fit account, check your inbox for a link to choose a new password. The link brings you back here."
+        );
+        return;
+      }
+
       if (authMode === "signup") {
         const confirm = String(fd.get("confirm_password") || "");
         if (password !== confirm) {
@@ -1512,7 +1640,7 @@ function wireForms() {
         // Confirm-email ON + already-registered email: error=null, session=null, identities=[].
         if (!data.user?.identities?.length) {
           setAuthNotice(
-            "This email may already have an account. Sign in here, or ask the captain to reset your password in Supabase."
+            "This email may already have an account. Sign in here, or use Forgot password? if you need a new one."
           );
           return;
         }
@@ -1529,9 +1657,39 @@ function wireForms() {
     }
   });
 
+  els.recoveryForm.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    setAuthError("");
+    setAuthNotice("");
+    setSubmitting(els.recoveryForm, true);
+    const fd = new FormData(els.recoveryForm);
+    const password = String(fd.get("new_password") || "");
+    const confirm = String(fd.get("confirm_new_password") || "");
+    try {
+      if (password !== confirm) {
+        setAuthError("Passwords do not match.");
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+      pendingPasswordRecovery = false;
+      els.recoveryForm.reset();
+      setAuthMode("signin", { clearMessages: false });
+      const { data } = await supabase.auth.getSession();
+      await onSession(data.session);
+      showStatus("Password updated. You’re signed in.", "success");
+    } finally {
+      setSubmitting(els.recoveryForm, false);
+    }
+  });
+
   els.signOut.addEventListener("click", async () => {
     els.signOut.disabled = true;
     try {
+      pendingPasswordRecovery = false;
       await supabase.auth.signOut();
     } finally {
       els.signOut.disabled = false;
@@ -1754,11 +1912,15 @@ async function main() {
   wireForms();
   syncSortControls();
 
+  if (urlLooksLikePasswordRecovery()) {
+    pendingPasswordRecovery = true;
+  }
+
   const { data } = await supabase.auth.getSession();
   await onSession(data.session);
 
-  supabase.auth.onAuthStateChange((_event, next) => {
-    onSession(next);
+  supabase.auth.onAuthStateChange((event, next) => {
+    onSession(next, event);
   });
 }
 
