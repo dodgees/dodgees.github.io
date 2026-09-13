@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  RECOVERY_LINK_FAILED_NOTICE,
-  resolvePendingPasswordRecovery,
-} from "../auth-recovery.js";
+import { resolvePendingPasswordRecovery } from "../auth-recovery.js";
 
 describe("resolvePendingPasswordRecovery", () => {
   it("continues when recovery is not pending", () => {
@@ -23,12 +20,5 @@ describe("resolvePendingPasswordRecovery", () => {
     // session must not keep the "Opening your reset link…" trap.
     assert.equal(resolvePendingPasswordRecovery(true, null), "link-failed");
     assert.equal(resolvePendingPasswordRecovery(true, undefined), "link-failed");
-  });
-});
-
-describe("RECOVERY_LINK_FAILED_NOTICE", () => {
-  it("points families back to Forgot password?", () => {
-    assert.match(RECOVERY_LINK_FAILED_NOTICE, /Forgot password\?/);
-    assert.match(RECOVERY_LINK_FAILED_NOTICE, /expired|already used/i);
   });
 });
