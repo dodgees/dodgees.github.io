@@ -5,7 +5,7 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 
 ## Current feature set (brief)
 
-- Email/password create account and sign in
+- Email/password create account (invite code required) and sign in
 - Display name and profile photo
 - Log weigh-ins and exercise (activity, minutes, optional note, date)
 - Personal progress (start → latest weight, total lost/gained, exercise minutes; 30-day window)
@@ -13,7 +13,7 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 - Recent entries feed (family-wide)
 - Encouragement: comments and emoji reactions on entries
 - PWA install to home screen
-- Anyone with the URL can join; signed-in members can read everyone’s logs (RLS blocks anonymous)
+- Create account needs the captain’s shared invite code; signed-in members can read everyone’s logs (RLS blocks anonymous)
 
 ## Gaps that hurt users
 
@@ -21,9 +21,9 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 
 Forgot password requires asking the captain to reset it in the Supabase dashboard. High friction for non-technical family members and blocks sign-in until someone intervenes.
 
-### 2. Open signup (no invite gate)
+### 2. Invite gate is a public shared secret (not server-enforced)
 
-Anyone who has the Family Fit URL can create an account and then see all weigh-ins and exercise logs. Acceptable while the link stays private; painful if the URL is shared or leaked.
+Create account checks `FAMILY_FIT_CONFIG.inviteCode` in the client. That stops casual signup from a leaked URL, but anyone who can read `config.js` (or the page source) still knows the code. Acceptable for a family app; rotate the code in config when it leaks. Turning off Supabase “Enable sign ups” would break this Create account path.
 
 ### 3. Members cannot edit or delete their own logs
 
@@ -56,4 +56,4 @@ If prioritizing fixes that reduce real user pain:
 1. Self-serve password reset
 2. Edit/delete own weigh-ins and exercise logs
 
-Then consider invite gating, notifications, and richer history/goals as product expansion rather than firefighting.
+Then consider notifications and richer history/goals as product expansion rather than firefighting.

@@ -32,6 +32,7 @@ import {
   mergeReactionAfterInsert,
   normalizeCommentBody,
 } from "./encouragement.js";
+import { validateSignupInvite } from "./invite.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -48,6 +49,7 @@ const els = {
   authModeSignin: document.getElementById("auth-mode-signin"),
   authModeSignup: document.getElementById("auth-mode-signup"),
   confirmPasswordField: document.getElementById("confirm-password-field"),
+  inviteCodeField: document.getElementById("invite-code-field"),
   signOut: document.getElementById("sign-out-btn"),
   whoami: document.getElementById("whoami"),
   editNameBtn: document.getElementById("edit-name-btn"),
@@ -207,6 +209,15 @@ function setAuthMode(mode) {
     confirmInput.disabled = !signup;
     if (!signup) confirmInput.value = "";
   }
+  if (els.inviteCodeField) {
+    els.inviteCodeField.hidden = !signup;
+    const inviteInput = els.authForm.invite_code;
+    if (inviteInput) {
+      inviteInput.required = signup;
+      inviteInput.disabled = !signup;
+      if (!signup) inviteInput.value = "";
+    }
+  }
   const passwordInput = els.authForm.password;
   if (passwordInput) {
     passwordInput.autocomplete = signup ? "new-password" : "current-password";
@@ -218,7 +229,7 @@ function setAuthMode(mode) {
     els.authSubmitBtn.dataset.label = submitLabel;
   }
   els.authHint.textContent = signup
-    ? "Create an account with email and password. If email confirmation is on, check your inbox then sign in; otherwise the family board opens right away. Share this page only with family."
+    ? "Create an account with email, password, and the family invite code from the captain. If email confirmation is on, check your inbox then sign in; otherwise the family board opens right away."
     : "Forgot your password? Ask the captain for help resetting it in Supabase — there’s no self-serve reset here.";
   setAuthError("");
   setAuthNotice("");
@@ -1422,6 +1433,11 @@ function wireForms() {
         const confirm = String(fd.get("confirm_password") || "");
         if (password !== confirm) {
           setAuthError("Passwords do not match.");
+          return;
+        }
+        const inviteError = validateSignupInvite(fd.get("invite_code"), cfg.inviteCode);
+        if (inviteError) {
+          setAuthError(inviteError);
           return;
         }
         const { data, error } = await supabase.auth.signUp({

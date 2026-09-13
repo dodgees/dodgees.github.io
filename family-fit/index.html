@@ -33,7 +33,7 @@
 
     <section id="auth-panel" class="panel auth-panel" hidden>
       <h2>Welcome to the family challenge</h2>
-      <p class="auth-welcome">Create an account or sign in with email and password to join the family board.</p>
+      <p class="auth-welcome">Sign in with email and password, or create an account with the family invite code from the captain.</p>
       <div class="auth-mode" role="group" aria-label="Account mode">
         <button type="button" class="auth-mode__btn is-active" id="auth-mode-signin" data-auth-mode="signin" aria-pressed="true">Sign in</button>
         <button type="button" class="auth-mode__btn" id="auth-mode-signup" data-auth-mode="signup" aria-pressed="false">Create account</button>
@@ -50,6 +50,10 @@
         <label id="confirm-password-field" hidden>
           Confirm password
           <input type="password" name="confirm_password" autocomplete="new-password" minlength="6" enterkeyhint="go">
+        </label>
+        <label id="invite-code-field" hidden>
+          Family invite code
+          <input type="text" name="invite_code" autocomplete="off" spellcheck="false" enterkeyhint="go" autocapitalize="off">
         </label>
         <button type="submit" class="btn-primary btn-block" id="auth-submit-btn">Sign in</button>
       </form>
