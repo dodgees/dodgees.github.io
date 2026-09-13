@@ -22,6 +22,7 @@ import {
   writeBoardSortPreference,
   writeBoardWindowPreference,
   loadBoardErrorShouldKeepBoard,
+  loadBoardResultShouldCommit,
   personalProgressFromLogs,
   personalProgressUnavailable,
   BOARD_SORT_STORAGE_KEY,
@@ -420,5 +421,15 @@ describe("loadBoardErrorShouldKeepBoard", () => {
     assert.equal(loadBoardErrorShouldKeepBoard(2, previousBoard, 1), true);
     assert.equal(loadBoardErrorShouldKeepBoard(2, null, 1), false);
     assert.equal(loadBoardErrorShouldKeepBoard(1, previousBoard, 1), false);
+  });
+});
+
+describe("loadBoardResultShouldCommit", () => {
+  it("commits only the latest generation that is not already superseded by a render", () => {
+    assert.equal(loadBoardResultShouldCommit(2, 2, 1), true);
+    assert.equal(loadBoardResultShouldCommit(1, 2, 1), false);
+    assert.equal(loadBoardResultShouldCommit(2, 3, 1), false);
+    assert.equal(loadBoardResultShouldCommit(1, 1, 2), false);
+    assert.equal(loadBoardResultShouldCommit(3, 3, 3), true);
   });
 });

@@ -13,7 +13,9 @@ import {
   isMissingAvatarPathError,
   localDateISO,
   loadBoardErrorShouldKeepBoard,
+  loadBoardResultShouldCommit,
   missingAvatarPathOperatorMessage,
+  normalizeBoardWindow,
   personalProgressFromSummary,
   personalProgressUnavailable,
   profileUpdateStatus,
@@ -114,6 +116,8 @@ let loadBoardGeneration = 0;
 let loadBoardRenderedGeneration = 0;
 /** Last committed board snapshot for keep-board when overlapping fetches fail. */
 let lastRenderedBoardMembers = null;
+/** Window that matches lastRenderedBoardMembers / committed board UI. */
+let lastRenderedBoardWindow = boardWindow;
 /** Map entryKey → reaction rows for the visible feed. */
 let reactionsByEntry = new Map();
 /** Map entryKey → comment rows for the visible feed. */
@@ -560,6 +564,7 @@ function renderSignedOut() {
   loadBoardGeneration = 0;
   loadBoardRenderedGeneration = 0;
   lastRenderedBoardMembers = null;
+  lastRenderedBoardWindow = boardWindow;
   avatarUrlByPath.clear();
   avatarPathsInUse.clear();
   clearAvatarUrlRefresh();
@@ -662,7 +667,7 @@ function setBoardSort(mode) {
 }
 
 function setBoardWindow(nextWindow) {
-  const next = writeBoardWindowPreference(nextWindow);
+  const next = normalizeBoardWindow(nextWindow);
   if (next === boardWindow) {
     syncWindowControls();
     return;
@@ -821,14 +826,21 @@ function renderBoard() {
 }
 
 function loadBoardResultIsStale(generation) {
-  return generation < loadBoardRenderedGeneration;
+  return !loadBoardResultShouldCommit(
+    generation,
+    loadBoardGeneration,
+    loadBoardRenderedGeneration
+  );
 }
 
-function commitLoadBoardRender(generation) {
+function commitLoadBoardRender(generation, windowCommitted) {
   loadBoardRenderedGeneration = generation;
   lastRenderedBoardMembers = boardMembers
     ? boardMembers.map((m) => ({ ...m }))
     : boardMembers;
+  lastRenderedBoardWindow = windowCommitted;
+  boardWindow = windowCommitted;
+  writeBoardWindowPreference(windowCommitted);
   if (avatarPathColumnOk === false) {
     setBoardError(missingAvatarPathOperatorMessage(), { soft: true });
   } else {
@@ -854,6 +866,7 @@ function syncPersonalProgressFromBoard() {
 
 async function loadBoard() {
   const generation = ++loadBoardGeneration;
+  const windowForLoad = boardWindow;
   const avatarRevAtStart = avatarRevision;
   const previousRenderedGeneration = loadBoardRenderedGeneration;
   setBoardError("");
@@ -861,7 +874,7 @@ async function loadBoard() {
   renderPersonalProgress(null);
   boardMembers = null;
 
-  const sinceDay = competitionSinceDay(new Date(), boardWindow);
+  const sinceDay = competitionSinceDay(new Date(), windowForLoad);
   const wantAvatar = avatarPathColumnOk !== false;
 
   let weighQuery = supabase
@@ -895,11 +908,6 @@ async function loadBoard() {
 
   if (profilesRes.error || weighRes.error || exerciseRes.error) {
     if (loadBoardResultIsStale(generation)) return true;
-    if (generation !== loadBoardGeneration) {
-      if (boardMembers !== null) return true;
-      if (loadBoardGeneration > generation) return true;
-      return generation <= loadBoardRenderedGeneration;
-    }
     if (
       loadBoardErrorShouldKeepBoard(
         generation,
@@ -907,9 +915,12 @@ async function loadBoard() {
         previousRenderedGeneration
       )
     ) {
+      const restoredWindow = lastRenderedBoardWindow;
       boardMembers = lastRenderedBoardMembers.map((m) => ({ ...m }));
       await patchSelfBoardAvatar();
-      commitLoadBoardRender(generation);
+      if (loadBoardResultIsStale(generation)) return true;
+      commitLoadBoardRender(generation, restoredWindow);
+      syncWindowControls();
       renderBoard();
       syncPersonalProgressFromBoard();
       return true;
@@ -934,7 +945,8 @@ async function loadBoard() {
   if (!profiles.length) {
     if (loadBoardResultIsStale(generation)) return true;
     boardMembers = [];
-    commitLoadBoardRender(generation);
+    commitLoadBoardRender(generation, windowForLoad);
+    syncWindowControls();
     renderBoard();
     syncPersonalProgressFromBoard();
     return true;
@@ -967,7 +979,7 @@ async function loadBoard() {
 
   boardMembers = profiles.map((p) => {
     const series = weighByUser.get(p.id) || [];
-    const weight = weightSummaryFromSeries(series, { window: boardWindow });
+    const weight = weightSummaryFromSeries(series, { window: windowForLoad });
     const mins = minutesByUser.get(p.id) || 0;
     const avatarPath =
       avatarPathColumnOk === false ? null : p.avatar_path || null;
@@ -986,7 +998,7 @@ async function loadBoard() {
     if (loadBoardResultIsStale(generation)) return true;
   }
 
-  commitLoadBoardRender(generation);
+  commitLoadBoardRender(generation, windowForLoad);
   syncWindowControls();
   syncSortControls();
   renderBoard();

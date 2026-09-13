@@ -453,3 +453,17 @@ export function loadBoardErrorShouldKeepBoard(
     previousBoardMembers !== null && generation > previousRenderedGeneration
   );
 }
+
+/**
+ * Whether an in-flight loadBoard completion should commit board UI/state.
+ * Ignores superseded generations (newer load started) and already-rendered newer results.
+ */
+export function loadBoardResultShouldCommit(
+  generation,
+  latestGeneration,
+  renderedGeneration
+) {
+  return (
+    generation === latestGeneration && generation >= renderedGeneration
+  );
+}
