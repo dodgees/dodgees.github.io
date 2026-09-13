@@ -5,7 +5,7 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 
 ## Current feature set (brief)
 
-- Email/password create account (invite code required) and sign in
+- Email/password create account (invite code required), sign in, and self-serve **Forgot password?** reset
 - Display name and profile photo
 - Log weigh-ins and exercise (activity, minutes, optional note, date)
 - Personal progress (start → latest weight, total lost/gained, exercise minutes; shared history window)
