@@ -2,7 +2,7 @@
 
 Family weight-loss / healthy-living competition mini-app, served as a static sub-app at `/family-fit/` on this GitHub Pages site. Auth and data live in Supabase (Postgres + Auth). The frontend is vanilla HTML/CSS/JS — no build step.
 
-Anyone with the Family Fit URL can **create an account** with email and password and join the competition board. Share the link only with family.
+**Create account** requires the shared family invite code from the captain (stored in public `config.js`). **Sign in** is email/password only — existing members do not need the invite code. URL secrecy alone is no longer the signup gate; still share the link only with family.
 
 > ### If you see `column profiles.avatar_path does not exist`
 >
@@ -52,30 +52,38 @@ Members upload photos from **Edit profile** in the app. Paths are stored on `pro
 
 1. Go to **Authentication → Providers → Email**.
 2. Ensure **Email** is enabled.
-3. Turn **on** “Enable sign ups” (wording may be “Allow new users to sign up”).
+3. Turn **on** “Enable sign ups” (wording may be “Allow new users to sign up”). **Keep this on** for the app’s Create account flow: the invite gate is enforced in the Family Fit client against `FAMILY_FIT_CONFIG.inviteCode`, not by turning off Supabase sign-ups. Disabling Supabase sign-ups would block legitimate create-account even with the correct invite code.
 4. Optional (smoother family UX): under **Authentication → Providers → Email** (or **Authentication → Settings**), turn **off** “Confirm email” so Create account signs members in immediately. If confirm stays on, new users must click the confirmation link before Sign in works.
 5. Keep email/password enabled so existing members can still Sign in.
 
 New accounts get a `profiles` row from the auth trigger in [`schema.sql`](./schema.sql) (same path as older invited users). They can set a display name in the app after sign-in.
 
-### 4. Wire public config
+### 4. Wire public config + invite code
 
-Edit [`config.js`](./config.js) (committed public config — anon key only):
+Edit [`config.js`](./config.js) (committed public config — Project URL, anon key, and `inviteCode`; never `service_role`):
 
 ```js
 window.FAMILY_FIT_CONFIG = {
   supabaseUrl: "https://YOUR_PROJECT_REF.supabase.co",
   supabaseAnonKey: "YOUR_SUPABASE_ANON_KEY",
+  inviteCode: "your-family-shared-secret",
 };
 ```
 
 [`config.example.js`](./config.example.js) is a template if you need to recreate the file.
 
+**Invite code (Create account gate):**
+
+- Required on **Create account** only. Sign-in never asks for it.
+- This value is visible in the public repo / browser — treat it as a **family shared secret**, not a high-security credential.
+- **Set or rotate:** change `inviteCode` in `config.js`, commit/deploy (or edit on the Pages host), then tell family the new code. Old accounts keep signing in with email/password; only new Create account attempts need the new code.
+- If `inviteCode` is missing or blank, Create account stays locked with a clear error (no silent open signup).
+
 ### 5. Optional: pre-create or reset accounts
 
-Dashboard invites are optional now (self-serve Create account is the default). You can still:
+Self-serve Create account still needs the invite code above. You can also:
 
-1. **Authentication → Users → Invite user** (or “Add user”) to pre-create someone.
+1. **Authentication → Users → Invite user** (or “Add user”) to pre-create someone in the dashboard.
 2. Send a fresh invite / use **Send password recovery** from the Users screen if someone forgets their password — the app has no self-serve reset.
 
 Optional: when creating a user via the Admin API / dashboard, set user metadata `display_name` so the profile starts with a nicer name.
@@ -118,7 +126,7 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 
 | Feature | Who |
 | --- | --- |
-| Create account / Sign in | Anyone with the app URL (email + password); password recovery is captain-assisted in Supabase (no self-serve reset) |
+| Create account / Sign in | Create account needs the captain’s invite code + email/password; Sign in is email/password only (no invite). Password recovery is captain-assisted in Supabase (no self-serve reset) |
 | Profile photo | Upload/replace/remove JPEG, PNG, or WebP (client-resized); shown on profile and board |
 | Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same 30-day window as the board) |
 | Log weight | Own entries only (write) |
@@ -154,4 +162,4 @@ Until that SQL runs, recent entries show a load-error banner and “Encouragemen
 
 - Commit only the **anon** key in `config.js`. Rotate it in Supabase if it ever leaks alongside a misconfigured RLS policy.
 - Never commit `.env` files containing `service_role`.
-- Health data is sensitive: share the Family Fit URL only with family. Anyone who can create an account becomes an authenticated peer and can read the board (RLS). Leave RLS enabled.
+- Health data is sensitive: share the Family Fit URL and invite code only with family. The invite code lives in public `config.js` (intentional shared secret — rotate when needed). Anyone who creates an account becomes an authenticated peer and can read the board (RLS). Leave RLS enabled. Do **not** turn off Supabase “Enable sign ups” unless you switch to dashboard-only user creation — the app invite gate needs sign-ups left on.
