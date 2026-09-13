@@ -60,7 +60,7 @@ New accounts get a `profiles` row from the auth trigger in [`schema.sql`](./sche
 
 ### 4. Wire public config + invite code
 
-Edit [`config.js`](./config.js) (committed public config — anon key only; never `service_role`):
+Edit [`config.js`](./config.js) (committed public config — Project URL, anon key, and `inviteCode`; never `service_role`):
 
 ```js
 window.FAMILY_FIT_CONFIG = {

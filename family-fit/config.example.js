@@ -2,7 +2,8 @@
  * Example public client config for Family Fit.
  * Copy to config.js and fill in values from Supabase → Project Settings → API.
  *
- * Only the URL + anon key belong in the browser. Never commit service_role.
+ * Safe to commit: Project URL, anon key, and family inviteCode.
+ * Never commit service_role. Invite setup/rotation: README.md.
  */
 window.FAMILY_FIT_CONFIG = {
   supabaseUrl: "https://YOUR_PROJECT_REF.supabase.co",
