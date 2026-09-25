@@ -1,0 +1,4 @@
+# https://www.erikdodge.com/robots.txt
+# Block Family Fit from crawlers; the rest of the site is allowed by default.
+User-agent: *
+Disallow: /family-fit/
