@@ -143,9 +143,9 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 | Create account / Sign in | Create account needs the captain’s invite code + email/password; Sign in is email/password only (no invite). **Forgot password?** sends a recovery email and returns to `/family-fit/` to set a new password |
 | Profile photo | Upload/replace/remove JPEG, PNG, or WebP (client-resized); shown on profile and board |
 | Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same selectable history window as the board: 7 / 30 / 90 / all-time) |
-| Log weight | Own entries only (write) |
-| Log exercise | Own entries only (write) |
-| Recent entries | Signed-in family can read everyone’s recent weigh-ins and workouts |
+| Log weight | Own entries only (write); edit/delete own from Recent entries |
+| Log exercise | Own entries only (write); edit/delete own from Recent entries |
+| Recent entries | Signed-in family can read everyone’s recent weigh-ins and workouts; owners can edit or delete theirs |
 | Encouragement | Comment or react (👍 ❤️ 🎉 💪 🔥) on any entry; edit/delete only your own |
 | Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change and the same history window as personal progress; both choices saved in the browser |
 

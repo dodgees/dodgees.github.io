@@ -7,7 +7,7 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 
 - Email/password create account (invite code required), sign in, and self-serve **Forgot password?** reset
 - Display name and profile photo
-- Log weigh-ins and exercise (activity, minutes, optional note, date)
+- Log weigh-ins and exercise (activity, minutes, optional note, date); edit or delete your own from Recent entries
 - Personal progress (start → latest weight, total lost/gained, exercise minutes; shared history window)
 - Competition board with sort by exercise or weight change and selectable history window (7 / 30 / 90 / all-time)
 - Recent entries feed (family-wide)
@@ -25,9 +25,9 @@ Self-serve **Forgot password?** is in the app: members request a reset email and
 
 Create account checks `FAMILY_FIT_CONFIG.inviteCode` in the client. That stops casual signup from a leaked URL, but anyone who can read `config.js` (or the page source) still knows the code. Acceptable for a family app; rotate the code in config when it leaks. Turning off Supabase “Enable sign ups” would break this Create account path.
 
-### 3. Members cannot edit or delete their own logs
+### 3. ~~Members cannot edit or delete their own logs~~ (done)
 
-Wrong weight, bad date, or typo on an exercise entry cannot be fixed in the app. Correction today means captain work in Supabase (or living with the mistake). This will come up in normal use.
+Own weigh-ins and exercise logs can be edited or deleted from Recent entries (Edit opens the log form; Delete confirms and removes the entry plus its comments/reactions).
 
 ### 4. No notifications or reminders
 
@@ -53,6 +53,7 @@ Schema/migrations and account cleanup are dashboard work. Fine for the captain; 
 
 If prioritizing fixes that reduce real user pain:
 
-1. Edit/delete own weigh-ins and exercise logs
+1. Notifications or “log today” reminders
+2. Custom date ranges / weekly goals view
 
-Then consider notifications and custom date ranges / goals as product expansion rather than firefighting.
+Then consider streaks and richer team rules as product expansion rather than firefighting.

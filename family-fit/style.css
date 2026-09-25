@@ -1280,6 +1280,36 @@ body.has-log-dock .toast {
   flex-shrink: 0;
 }
 
+.entry-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.entry-actions button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.2rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.entry-actions button:hover {
+  color: var(--text);
+}
+
 .entry-encourage {
   display: flex;
   flex-direction: column;

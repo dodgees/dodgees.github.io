@@ -43,6 +43,12 @@ import {
   RECOVERY_LINK_FAILED_NOTICE,
   resolvePendingPasswordRecovery,
 } from "./auth-recovery.js";
+import {
+  formatExerciseDetail,
+  formatWeightDetail,
+  normalizeExercisePayload,
+  normalizeWeightPayload,
+} from "./entry-log.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -111,7 +117,11 @@ let pendingPasswordRecovery = false;
 /** @type {"weight"|"exercise"|null} */
 let activeLog = null;
 /** @type {{ kind: "weight"|"exercise", id: string } | null} */
+let editingEntry = null;
+/** @type {{ kind: "weight"|"exercise", id: string } | null} */
 let highlightTarget = null;
+/** @type {Map<string, object>} */
+let recentEntryByKey = new Map();
 /** @type {"exercise"|"weight"} */
 let boardSort = readBoardSortPreference();
 /** @type {import("./board-math.js").BoardWindow} */
@@ -594,7 +604,7 @@ async function removeAvatar() {
   }
 }
 
-function setLogMode(mode, { scroll = true, focus = true } = {}) {
+function setLogMode(mode, { scroll = true, focus = true, seedDate = true } = {}) {
   const next = mode === "weight" || mode === "exercise" ? mode : null;
   const entering = Boolean(next && next !== activeLog);
   activeLog = next;
@@ -612,7 +622,7 @@ function setLogMode(mode, { scroll = true, focus = true } = {}) {
 
   if (!activeLog) return;
 
-  if (entering) {
+  if (entering && seedDate && !editingEntry) {
     seedDates();
   }
 
@@ -629,7 +639,89 @@ function setLogMode(mode, { scroll = true, focus = true } = {}) {
   }
 }
 
+function syncLogSubmitLabels() {
+  const weightBtn = els.weightForm.querySelector('button[type="submit"]');
+  const exerciseBtn = els.exerciseForm.querySelector('button[type="submit"]');
+  if (weightBtn) {
+    weightBtn.textContent =
+      editingEntry?.kind === "weight" ? "Save weigh-in" : "Add weigh-in";
+    delete weightBtn.dataset.label;
+  }
+  if (exerciseBtn) {
+    exerciseBtn.textContent =
+      editingEntry?.kind === "exercise" ? "Save exercise" : "Add exercise";
+    delete exerciseBtn.dataset.label;
+  }
+}
+
+function clearEditingEntry() {
+  if (!editingEntry) {
+    syncLogSubmitLabels();
+    return;
+  }
+  editingEntry = null;
+  syncLogSubmitLabels();
+}
+
+function openNewLog(mode) {
+  clearEditingEntry();
+  if (mode === "weight") els.weightForm.reset();
+  if (mode === "exercise") els.exerciseForm.reset();
+  seedDates();
+  setLogMode(mode, { seedDate: false });
+}
+
+function fillWeightForm(entry) {
+  els.weightForm.weight_lbs.value = entry.weightLbs ?? "";
+  els.weightForm.recorded_on.value = entry.recordedOn ?? "";
+  els.weightForm.note.value = entry.note ?? "";
+}
+
+function fillExerciseForm(entry) {
+  els.exerciseForm.activity.value = entry.activity ?? "";
+  els.exerciseForm.duration_minutes.value = entry.durationMinutes ?? "";
+  els.exerciseForm.recorded_on.value = entry.recordedOn ?? "";
+  els.exerciseForm.note.value = entry.note ?? "";
+}
+
+function beginEditEntry(kind, id) {
+  const key = entryKey(kind, id);
+  const entry = recentEntryByKey.get(key);
+  if (!entry || entry.userId !== session?.user?.id) return;
+  editingEntry = { kind, id };
+  if (kind === "weight") {
+    fillWeightForm(entry);
+  } else {
+    fillExerciseForm(entry);
+  }
+  syncLogSubmitLabels();
+  setLogMode(kind, { seedDate: false });
+}
+
+async function deleteOwnEntry(kind, id) {
+  const key = entryKey(kind, id);
+  const entry = recentEntryByKey.get(key);
+  if (!entry || entry.userId !== session?.user?.id) return;
+  const label = kind === "weight" ? "weigh-in" : "exercise log";
+  if (!window.confirm(`Delete this ${label}? Comments and reactions on it will go away too.`)) {
+    return;
+  }
+  const table = kind === "weight" ? "weigh_ins" : "exercise_logs";
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (error) {
+    showStatus(error.message, "error");
+    return;
+  }
+  if (editingEntry?.kind === kind && editingEntry?.id === id) {
+    clearEditingEntry();
+    collapseLogForms();
+  }
+  showStatus(kind === "weight" ? "Weigh-in deleted." : "Exercise log deleted.", "success");
+  await refreshAppData();
+}
+
 function collapseLogForms() {
+  clearEditingEntry();
   setLogMode(null);
 }
 
@@ -1112,6 +1204,7 @@ async function loadRecentEntries() {
   ]);
 
   if (w.error || e.error) {
+    recentEntryByKey = new Map();
     listEl.innerHTML = `<p class="error">${escapeHtml((w.error || e.error).message)}</p>`;
     return;
   }
@@ -1124,29 +1217,39 @@ async function loadRecentEntries() {
     for (const m of boardMembers) profileNameById.set(m.id, m.name);
   }
 
-  /** @type {Array<{ kind: "weight"|"exercise", id: string, userId: string, sort: string, detail: string, recordedOn: string }>} */
+  /** @type {Array<{ kind: "weight"|"exercise", id: string, userId: string, sort: string, detail: string, recordedOn: string, weightLbs?: number, activity?: string, durationMinutes?: number, note: string|null }>} */
   const rows = [];
+  recentEntryByKey = new Map();
   for (const row of w.data || []) {
-    const note = row.note ? " — " + row.note : "";
-    rows.push({
+    const note = row.note || null;
+    const entry = {
       kind: "weight",
       id: row.id,
       userId: row.user_id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      detail: `${row.weight_lbs} lbs${note}`,
+      detail: formatWeightDetail(row.weight_lbs, note),
       recordedOn: row.recorded_on,
-    });
+      weightLbs: row.weight_lbs,
+      note,
+    };
+    rows.push(entry);
+    recentEntryByKey.set(entryKey("weight", row.id), entry);
   }
   for (const row of e.data || []) {
-    const note = row.note ? " — " + row.note : "";
-    rows.push({
+    const note = row.note || null;
+    const entry = {
       kind: "exercise",
       id: row.id,
       userId: row.user_id,
       sort: row.recorded_on + "T" + (row.created_at || ""),
-      detail: `${row.activity} · ${row.duration_minutes} min${note}`,
+      detail: formatExerciseDetail(row.activity, row.duration_minutes, note),
       recordedOn: row.recorded_on,
-    });
+      activity: row.activity,
+      durationMinutes: row.duration_minutes,
+      note,
+    };
+    rows.push(entry);
+    recentEntryByKey.set(entryKey("exercise", row.id), entry);
   }
   rows.sort((a, b) => (a.sort < b.sort ? 1 : -1));
   const visible = rows.slice(0, 14);
@@ -1264,6 +1367,12 @@ function renderEntryCard(entry, currentUserId) {
   const badgeClass =
     entry.kind === "weight" ? "entry-badge entry-badge--weight" : "entry-badge entry-badge--exercise";
   const badgeLabel = entry.kind === "weight" ? "Weight" : "Exercise";
+  const ownActions = isSelf
+    ? `<span class="entry-actions">
+        <button type="button" data-entry-edit>Edit</button>
+        <button type="button" data-entry-delete>Delete</button>
+      </span>`
+    : "";
 
   return `<article class="entry-row" data-kind="${escapeHtml(entry.kind)}" data-id="${escapeHtml(entry.id)}" data-entry-key="${escapeHtml(key)}">
     <div class="entry-row__top">
@@ -1271,7 +1380,10 @@ function renderEntryCard(entry, currentUserId) {
       <div class="entry-main">
         <span class="entry-who">${who}</span>
         <span class="entry-detail">${escapeHtml(entry.detail)}</span>
-        <span class="entry-meta">${escapeHtml(entry.recordedOn)}</span>
+        <div class="entry-meta-row">
+          <span class="entry-meta">${escapeHtml(entry.recordedOn)}</span>
+          ${ownActions}
+        </div>
       </div>
     </div>
     <div class="entry-encourage">
@@ -1736,13 +1848,19 @@ function wireForms() {
     }
   });
 
-  const openWeight = () => setLogMode(activeLog === "weight" ? null : "weight");
-  const openExercise = () => setLogMode(activeLog === "exercise" ? null : "exercise");
+  const openWeight = () => {
+    if (activeLog === "weight") collapseLogForms();
+    else openNewLog("weight");
+  };
+  const openExercise = () => {
+    if (activeLog === "exercise") collapseLogForms();
+    else openNewLog("exercise");
+  };
 
   els.openWeightBtn.addEventListener("click", openWeight);
   els.openExerciseBtn.addEventListener("click", openExercise);
-  els.dockWeightBtn.addEventListener("click", () => setLogMode("weight"));
-  els.dockExerciseBtn.addEventListener("click", () => setLogMode("exercise"));
+  els.dockWeightBtn.addEventListener("click", () => openNewLog("weight"));
+  els.dockExerciseBtn.addEventListener("click", () => openNewLog("exercise"));
 
   document.querySelectorAll(".cancel-log-btn").forEach((btn) => {
     btn.addEventListener("click", () => collapseLogForms());
@@ -1763,7 +1881,25 @@ function wireForms() {
     const openLogBtn = ev.target.closest("[data-open-log]");
     if (openLogBtn && els.app.contains(openLogBtn)) {
       const mode = openLogBtn.getAttribute("data-open-log");
-      if (mode === "weight" || mode === "exercise") setLogMode(mode);
+      if (mode === "weight" || mode === "exercise") openNewLog(mode);
+      return;
+    }
+
+    const entryEditBtn = ev.target.closest("[data-entry-edit]");
+    if (entryEditBtn && els.app.contains(entryEditBtn)) {
+      const card = entryEditBtn.closest(".entry-row");
+      const kind = card?.getAttribute("data-kind");
+      const id = card?.getAttribute("data-id");
+      if ((kind === "weight" || kind === "exercise") && id) beginEditEntry(kind, id);
+      return;
+    }
+
+    const entryDeleteBtn = ev.target.closest("[data-entry-delete]");
+    if (entryDeleteBtn && els.app.contains(entryDeleteBtn)) {
+      const card = entryDeleteBtn.closest(".entry-row");
+      const kind = card?.getAttribute("data-kind");
+      const id = card?.getAttribute("data-id");
+      if ((kind === "weight" || kind === "exercise") && id) deleteOwnEntry(kind, id);
       return;
     }
 
@@ -1832,26 +1968,45 @@ function wireForms() {
     setSubmitting(els.weightForm, true);
     try {
       const fd = new FormData(els.weightForm);
-      const payload = {
-        user_id: session.user.id,
-        weight_lbs: Number(fd.get("weight_lbs")),
-        recorded_on: String(fd.get("recorded_on")),
-        note: String(fd.get("note") || "").trim() || null,
-      };
-      const { data, error } = await supabase
-        .from("weigh_ins")
-        .insert(payload)
-        .select("id")
-        .single();
+      const normalized = normalizeWeightPayload({
+        weightLbs: fd.get("weight_lbs"),
+        recordedOn: fd.get("recorded_on"),
+        note: fd.get("note"),
+      });
+      if (!normalized.ok) {
+        showStatus(normalized.message, "error");
+        return;
+      }
+      const editingId =
+        editingEntry?.kind === "weight" ? editingEntry.id : null;
+      let data;
+      let error;
+      if (editingId) {
+        ({ data, error } = await supabase
+          .from("weigh_ins")
+          .update(normalized.payload)
+          .eq("id", editingId)
+          .eq("user_id", session.user.id)
+          .select("id")
+          .single());
+      } else {
+        ({ data, error } = await supabase
+          .from("weigh_ins")
+          .insert({ user_id: session.user.id, ...normalized.payload })
+          .select("id")
+          .single());
+      }
       if (error) {
         showStatus(error.message, "error");
         return;
       }
       els.weightForm.reset();
       seedDates();
-      if (data?.id) highlightTarget = { kind: "weight", id: data.id };
+      const savedId = data?.id || editingId;
+      if (savedId) highlightTarget = { kind: "weight", id: savedId };
+      clearEditingEntry();
       collapseLogForms();
-      showStatus("Weigh-in logged.", "success");
+      showStatus(editingId ? "Weigh-in updated." : "Weigh-in logged.", "success");
       await refreshAppData();
     } finally {
       setSubmitting(els.weightForm, false);
@@ -1863,27 +2018,46 @@ function wireForms() {
     setSubmitting(els.exerciseForm, true);
     try {
       const fd = new FormData(els.exerciseForm);
-      const payload = {
-        user_id: session.user.id,
-        activity: String(fd.get("activity") || "").trim(),
-        duration_minutes: Number(fd.get("duration_minutes")),
-        recorded_on: String(fd.get("recorded_on")),
-        note: String(fd.get("note") || "").trim() || null,
-      };
-      const { data, error } = await supabase
-        .from("exercise_logs")
-        .insert(payload)
-        .select("id")
-        .single();
+      const normalized = normalizeExercisePayload({
+        activity: fd.get("activity"),
+        durationMinutes: fd.get("duration_minutes"),
+        recordedOn: fd.get("recorded_on"),
+        note: fd.get("note"),
+      });
+      if (!normalized.ok) {
+        showStatus(normalized.message, "error");
+        return;
+      }
+      const editingId =
+        editingEntry?.kind === "exercise" ? editingEntry.id : null;
+      let data;
+      let error;
+      if (editingId) {
+        ({ data, error } = await supabase
+          .from("exercise_logs")
+          .update(normalized.payload)
+          .eq("id", editingId)
+          .eq("user_id", session.user.id)
+          .select("id")
+          .single());
+      } else {
+        ({ data, error } = await supabase
+          .from("exercise_logs")
+          .insert({ user_id: session.user.id, ...normalized.payload })
+          .select("id")
+          .single());
+      }
       if (error) {
         showStatus(error.message, "error");
         return;
       }
       els.exerciseForm.reset();
       seedDates();
-      if (data?.id) highlightTarget = { kind: "exercise", id: data.id };
+      const savedId = data?.id || editingId;
+      if (savedId) highlightTarget = { kind: "exercise", id: savedId };
+      clearEditingEntry();
       collapseLogForms();
-      showStatus("Exercise logged.", "success");
+      showStatus(editingId ? "Exercise updated." : "Exercise logged.", "success");
       await refreshAppData();
     } finally {
       setSubmitting(els.exerciseForm, false);
