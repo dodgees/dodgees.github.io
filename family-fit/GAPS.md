@@ -10,7 +10,7 @@ This is not a roadmap; it is a frank inventory of missing functionality relative
 - Log weigh-ins and exercise (activity, minutes, optional note, date); edit or delete your own from Recent entries
 - Personal progress (start → latest weight, total lost/gained, exercise minutes; shared history window)
 - Competition board with sort by exercise or weight change and selectable history window (7 / 30 / 90 / all-time)
-- Recent entries feed (family-wide)
+- Recent entries feed (family-wide), quietly refreshed about every 30s while the tab is open
 - Encouragement: comments and emoji reactions on entries
 - PWA install to home screen
 - Create account needs the captain’s shared invite code; signed-in members can read everyone’s logs (RLS blocks anonymous)
@@ -37,9 +37,9 @@ Encouragement and competition only work when people open the app. There are no p
 
 Members can pick 7 / 30 / 90 / all-time for personal progress and the board, but there is still no arbitrary custom range, calendar week view, or goal-period breakdown.
 
-### 6. Recent entries are capped and not real-time
+### 6. ~~Recent entries are capped and not real-time~~ (partial)
 
-The feed shows a short slice of recent activity and does not live-update. Comments and reactions from others generally need a refresh to appear. Easy to miss family activity.
+Feed and board poll quietly about every 30 seconds while the tab is visible, and again when the tab is focused. Updates still are not instant (websocket realtime), and the feed remains a short recent slice.
 
 ### 7. No goals, streaks, or team rules
 

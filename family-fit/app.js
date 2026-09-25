@@ -49,6 +49,11 @@ import {
   normalizeExercisePayload,
   normalizeWeightPayload,
 } from "./entry-log.js";
+import {
+  LIVE_REFRESH_INTERVAL_MS,
+  shouldPollOnVisibility,
+  shouldRunLiveRefresh,
+} from "./live-refresh.js";
 
 const cfg = window.FAMILY_FIT_CONFIG || {};
 const configured = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey);
@@ -164,6 +169,16 @@ const AVATAR_SIGNED_URL_TTL_SEC = 3600;
 const AVATAR_SIGNED_URL_REFRESH_MS = (AVATAR_SIGNED_URL_TTL_SEC - 600) * 1000;
 /** @type {ReturnType<typeof setTimeout> | null} */
 let avatarUrlRefreshTimer = null;
+/** @type {ReturnType<typeof setInterval> | null} */
+let liveRefreshTimer = null;
+/** True while a background live refresh is in flight. */
+let liveRefreshInFlight = false;
+/** Last time a live refresh started (ms). */
+let liveRefreshLastStartedAt = 0;
+/** Latest loadRecentEntries call; older completions are discarded. */
+let loadRecentEntriesGeneration = 0;
+/** Whether visibility / focus listeners for live refresh are wired. */
+let liveRefreshListenersWired = false;
 
 function clearAvatarUrlRefresh() {
   clearTimeout(avatarUrlRefreshTimer);
@@ -726,6 +741,7 @@ function collapseLogForms() {
 }
 
 function renderSignedOut() {
+  stopLiveRefresh();
   els.auth.hidden = false;
   els.app.hidden = true;
   document.body.classList.remove("has-log-dock");
@@ -735,6 +751,7 @@ function renderSignedOut() {
   avatarPathColumnOk = null;
   loadBoardGeneration = 0;
   loadBoardRenderedGeneration = 0;
+  loadRecentEntriesGeneration = 0;
   lastRenderedBoardMembers = null;
   lastRenderedBoardWindow = boardWindow;
   avatarUrlByPath.clear();
@@ -1036,15 +1053,18 @@ function syncPersonalProgressFromBoard() {
   );
 }
 
-async function loadBoard() {
+async function loadBoard(options = {}) {
+  const quiet = Boolean(options.quiet);
   const generation = ++loadBoardGeneration;
   const windowForLoad = boardWindow;
   const avatarRevAtStart = avatarRevision;
   const previousRenderedGeneration = loadBoardRenderedGeneration;
-  setBoardError("");
-  els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
-  renderPersonalProgress(null);
-  boardMembers = null;
+  if (!quiet) {
+    setBoardError("");
+    els.leaderboard.innerHTML = '<p class="muted">Loading…</p>';
+    renderPersonalProgress(null);
+    boardMembers = null;
+  }
 
   const sinceDay = competitionSinceDay(new Date(), windowForLoad);
   const wantAvatar = avatarPathColumnOk !== false;
@@ -1097,6 +1117,7 @@ async function loadBoard() {
       syncPersonalProgressFromBoard();
       return true;
     }
+    if (quiet && lastRenderedBoardMembers) return true;
     if (boardMembers !== null) return true;
     const err = profilesRes.error || weighRes.error || exerciseRes.error;
     setBoardError(
@@ -1178,13 +1199,43 @@ async function loadBoard() {
   return true;
 }
 
-async function loadRecentEntries() {
+function captureCommentDrafts() {
+  /** @type {Map<string, string>} */
+  const drafts = new Map();
+  const listEl = els.recentEntries;
+  if (!listEl) return drafts;
+  listEl.querySelectorAll("[data-comment-form]").forEach((form) => {
+    const card = form.closest(".entry-row");
+    const key = card?.getAttribute("data-entry-key");
+    const body = String(new FormData(form).get("body") || "");
+    if (key && body) drafts.set(key, body);
+  });
+  return drafts;
+}
+
+function restoreCommentDrafts(drafts) {
+  if (!drafts?.size || !els.recentEntries) return;
+  for (const [key, body] of drafts) {
+    const card = els.recentEntries.querySelector(
+      `[data-entry-key="${cssEscapeAttr(key)}"]`
+    );
+    const input = card?.querySelector('[data-comment-form] [name="body"]');
+    if (input) input.value = body;
+  }
+}
+
+async function loadRecentEntries(options = {}) {
+  const quiet = Boolean(options.quiet);
   const mark = highlightTarget;
   highlightTarget = null;
   const listEl = els.recentEntries;
-  if (!listEl) return;
+  if (!listEl || !session?.user?.id) return;
 
-  listEl.innerHTML = '<p class="muted">Loading…</p>';
+  const generation = ++loadRecentEntriesGeneration;
+  const drafts = quiet ? captureCommentDrafts() : new Map();
+  if (!quiet) {
+    listEl.innerHTML = '<p class="muted">Loading…</p>';
+  }
   const uid = session.user.id;
 
   const [w, e, profilesRes] = await Promise.all([
@@ -1203,7 +1254,10 @@ async function loadRecentEntries() {
     supabase.from("profiles").select("id, display_name"),
   ]);
 
+  if (generation !== loadRecentEntriesGeneration) return;
+
   if (w.error || e.error) {
+    if (quiet && listEl.querySelector(".entry-row, .empty-state")) return;
     recentEntryByKey = new Map();
     listEl.innerHTML = `<p class="error">${escapeHtml((w.error || e.error).message)}</p>`;
     return;
@@ -1255,6 +1309,7 @@ async function loadRecentEntries() {
   const visible = rows.slice(0, 14);
 
   if (!visible.length) {
+    if (generation !== loadRecentEntriesGeneration) return;
     reactionsByEntry = new Map();
     commentsByEntry = new Map();
     encouragementLoaded = false;
@@ -1274,6 +1329,8 @@ async function loadRecentEntries() {
     fetchEncouragementRows("entry_comments", weighIds, exerciseIds),
     fetchEncouragementRows("entry_reactions", weighIds, exerciseIds),
   ]);
+
+  if (generation !== loadRecentEntriesGeneration) return;
 
   const encourageError = commentsRes.error || reactionsRes.error;
   if (encourageError) {
@@ -1302,7 +1359,9 @@ async function loadRecentEntries() {
       })
       .join("");
 
-  if (marked) {
+  restoreCommentDrafts(drafts);
+
+  if (marked && !quiet) {
     const fresh = listEl.querySelector(".entry-row.is-fresh");
     fresh?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
@@ -1643,6 +1702,61 @@ async function refreshAppData() {
   syncProfileAvatarUi();
 }
 
+async function pollLiveAppData() {
+  if (
+    !shouldRunLiveRefresh({
+      signedIn: Boolean(session),
+      documentHidden: typeof document !== "undefined" && document.hidden,
+      pollInFlight: liveRefreshInFlight,
+    })
+  ) {
+    return;
+  }
+  liveRefreshInFlight = true;
+  liveRefreshLastStartedAt = Date.now();
+  try {
+    await Promise.all([
+      loadBoard({ quiet: true }),
+      loadRecentEntries({ quiet: true }),
+    ]);
+  } catch {
+    // Keep the last good UI on background poll failures.
+  } finally {
+    liveRefreshInFlight = false;
+  }
+}
+
+function stopLiveRefresh() {
+  if (liveRefreshTimer) {
+    clearInterval(liveRefreshTimer);
+    liveRefreshTimer = null;
+  }
+  liveRefreshInFlight = false;
+}
+
+function startLiveRefresh() {
+  stopLiveRefresh();
+  if (!session) return;
+  liveRefreshTimer = setInterval(() => {
+    pollLiveAppData();
+  }, LIVE_REFRESH_INTERVAL_MS);
+}
+
+function onLiveRefreshBecameVisible() {
+  if (!session || document.hidden) return;
+  if (!shouldPollOnVisibility(liveRefreshLastStartedAt, Date.now())) return;
+  pollLiveAppData();
+}
+
+function wireLiveRefreshListeners() {
+  if (liveRefreshListenersWired) return;
+  liveRefreshListenersWired = true;
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) onLiveRefreshBecameVisible();
+  });
+  window.addEventListener("focus", onLiveRefreshBecameVisible);
+}
+
 function renderPasswordRecovery() {
   els.auth.hidden = false;
   els.app.hidden = true;
@@ -1662,6 +1776,7 @@ async function onSession(next, event) {
 
   const recoveryOutcome = resolvePendingPasswordRecovery(pendingPasswordRecovery, session);
   if (recoveryOutcome === "show-recovery") {
+    stopLiveRefresh();
     renderPasswordRecovery();
     return;
   }
@@ -1681,12 +1796,14 @@ async function onSession(next, event) {
   renderSignedIn(session.user);
   try {
     await refreshAppData();
+    startLiveRefresh();
   } catch (err) {
     if (isMissingAvatarPathError(err)) {
       noteMissingAvatarPathColumn();
     } else {
       setBoardError(err.message || String(err));
     }
+    startLiveRefresh();
   }
 }
 
@@ -2084,6 +2201,7 @@ async function main() {
 
   setAuthMode("signin");
   wireForms();
+  wireLiveRefreshListeners();
   syncSortControls();
 
   if (urlLooksLikePasswordRecovery()) {

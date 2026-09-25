@@ -145,7 +145,7 @@ Manifest: [`manifest.webmanifest`](./manifest.webmanifest). Icons live in [`icon
 | Personal progress | Signed-in member: start → latest weight, total lost/gained, and exercise minutes (same selectable history window as the board: 7 / 30 / 90 / all-time) |
 | Log weight | Own entries only (write); edit/delete own from Recent entries |
 | Log exercise | Own entries only (write); edit/delete own from Recent entries |
-| Recent entries | Signed-in family can read everyone’s recent weigh-ins and workouts; owners can edit or delete theirs |
+| Recent entries | Signed-in family can read everyone’s recent weigh-ins and workouts; owners can edit or delete theirs; board + feed refresh quietly about every 30s while the tab is open |
 | Encouragement | Comment or react (👍 ❤️ 🎉 💪 🔥) on any entry; edit/delete only your own |
 | Competition board | Signed-in family can read everyone’s progress; sort by exercise or weight change and the same history window as personal progress; both choices saved in the browser |
 
