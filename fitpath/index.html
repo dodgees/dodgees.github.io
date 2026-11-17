@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FitPath — turn every run and walk into miles on a journey from Omaha to Yosemite.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1c3d2e">
+  <title>FitPath</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="home-link" href="/">Erik Dodge</a>
+    <p class="brand">FitPath</p>
+  </header>
+
+  <section class="hero" aria-label="Current destination">
+    <div id="hero-media" class="hero-media" role="img" aria-label="Photo of the next destination"></div>
+    <div class="hero-veil" aria-hidden="true"></div>
+    <div class="hero-copy">
+      <p id="status-eyebrow" class="eyebrow">Loading path</p>
+      <h1 id="status-title">FitPath</h1>
+      <p id="status-lede" class="lede">Every mile you log moves you west from Omaha through prairie towns, red rock, neon, and the Sierra.</p>
+      <div class="hero-stats" aria-label="Mileage summary">
+        <div>
+          <span id="miles-done" class="stat-num">0</span>
+          <span class="stat-label">miles logged</span>
+        </div>
+        <div>
+          <span id="miles-next" class="stat-num">—</span>
+          <span class="stat-label">to next stop</span>
+        </div>
+      </div>
+      <div class="progress-wrap" aria-live="polite">
+        <div class="progress-track">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <p id="progress-label" class="progress-label">Calculating leg…</p>
+      </div>
+      <div id="hero-thumbs" class="hero-thumbs" aria-label="Destination photos"></div>
+      <p id="hero-credit" class="hero-credit"></p>
+    </div>
+  </section>
+
+  <main class="page">
+    <section class="log-section" aria-labelledby="log-heading">
+      <div class="section-head">
+        <h2 id="log-heading">Log miles</h2>
+        <p>Run, walk, or row — it all advances the path. Stored only in this browser.</p>
+      </div>
+      <form id="log-form" class="log-form">
+        <label>
+          Miles
+          <input id="miles-input" name="miles" type="number" min="0.1" step="0.1" inputmode="decimal" required placeholder="3.2">
+        </label>
+        <label>
+          Activity
+          <select id="activity-select" name="activity">
+            <option value="run">Run</option>
+            <option value="walk" selected>Walk</option>
+            <option value="row">Row</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label class="note-field">
+          Note <span class="optional">(optional)</span>
+          <input id="note-input" name="note" type="text" maxlength="120" placeholder="Evening loop around the lake">
+        </label>
+        <button type="submit" class="btn-primary">Add to path</button>
+      </form>
+      <p id="log-feedback" class="feedback" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="trail-section" aria-labelledby="trail-heading">
+      <div class="section-head">
+        <h2 id="trail-heading">The path</h2>
+        <p>Twenty-two stops from Omaha to Yosemite — towns, overlooks, neon, and parks. Tap thumbnails to flip photos.</p>
+      </div>
+      <ol id="trail" class="trail"></ol>
+    </section>
+
+    <section class="history-section" aria-labelledby="history-heading">
+      <div class="section-head row">
+        <div>
+          <h2 id="history-heading">Recent logs</h2>
+          <p><span id="total-stat">0</span> miles total on this device.</p>
+        </div>
+        <button type="button" id="clear-history" class="btn-ghost">Clear log</button>
+      </div>
+      <ul id="history-list" class="history-list"></ul>
+    </section>
+
+    <footer class="site-footer">
+      <p>FitPath · Omaha westward · Photos credited in <a href="CREDITS.md">CREDITS.md</a></p>
+    </footer>
+  </main>
+
+  <script src="route.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

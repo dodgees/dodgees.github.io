@@ -3,8 +3,9 @@
 This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
 
 - Add durable project-specific notes here as they are discovered through real work.
-- Flat static GitHub Pages site; side projects live as path folders (e.g. `/picket/`, `/family-fit/`) and are linked from the homepage easter-egg side-projects list in `index.html`.
+- Flat static GitHub Pages site; side projects live as path folders (e.g. `/picket/`, `/family-fit/`, `/fitpath/`) and are linked from the homepage easter-egg side-projects list in `index.html`.
 - Family Fit (`family-fit/`): email/password Supabase auth + shared `inviteCode` gate on Create account (Sign-in unchanged) + self-serve Forgot password? + Postgres mini-app. Setup / Auth URL allow-list for recovery: `family-fit/README.md`. Schema/RLS: `family-fit/schema.sql`. Live `avatar_path` missing → captain one-shot `family-fit/migrate-avatar-path.sql`. Public anon config only in `family-fit/config.js` — never commit `service_role`.
+- FitPath (`fitpath/`): personal exercise mileage journey Omaha → Yosemite (22 stops, multi-photo galleries); route in `fitpath/route.js`; logs in `localStorage` only; image attributions in `fitpath/CREDITS.md`.
 
 ## Maintaining this file
 
